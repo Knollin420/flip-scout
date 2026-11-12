@@ -82,8 +82,24 @@ class Pipeline:
 
     # --- run --------------------------------------------------------------
 
+    def reseed_after_pause(self) -> bool:
+        """Vinted no longer sends upload times, so after a long pause everything uploaded
+        meanwhile would look new. After a pause longer than max_age_minutes all searches
+        only remember the current listings again (like a first run)."""
+        last = self.store.get("last_search_ts")
+        if not last:
+            return False
+        pause = self.now() - float(last)
+        if pause <= self.cfg.settings.max_age_minutes * 60:
+            return False
+        for search in self.store.list_searches():
+            self.store.reset_seeding(search.id)
+        log.info("Pause von %.0f min – merke mir zuerst nur den aktuellen Stand", pause / 60)
+        return True
+
     def run_once(self) -> RunResult:
         result = RunResult()
+        self.reseed_after_pause()
         first_request = True
         for search in self.store.list_searches(active_only=True):
             profile = self.cfg.profile(search.profile)
@@ -134,6 +150,8 @@ class Pipeline:
                     self.store.unmark_seen(search.id, item.id)
                 except Exception:
                     log.exception("[%s] Fehler bei Anzeige %s", search.name, item.id)
+        if result.requests_ok:
+            self.store.set("last_search_ts", str(self.now()))
         return result
 
     # --- one listing ------------------------------------------------------

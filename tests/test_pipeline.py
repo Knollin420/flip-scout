@@ -200,3 +200,15 @@ def test_blocked_run_is_reported_as_failed(env, store):
     store.add_search("S", "standard", ["s"])
     vinted.fail = True
     assert pipe.run_once().failed
+
+
+def test_long_pause_only_remembers_again(env, store, cfg):
+    cfg.profiles["standard"].briefing = False
+    pipe, vinted, _, notifier = env()
+    store.add_search("S", "standard", ["s"])
+    pipe.run_once()  # first run: remember
+    vinted.results["s"] = [make_item(1), make_item(2)]  # uploaded during the night
+    store.set("last_search_ts", str(float(store.get("last_search_ts")) - 8 * 3600))
+    assert pipe.run_once().hits == 0  # after 8 h pause: only remembered
+    vinted.results["s"].insert(0, make_item(3))
+    assert pipe.run_once().hits == 1  # really new -> reported
