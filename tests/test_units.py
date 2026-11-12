@@ -230,6 +230,7 @@ def test_item_box_fields():
         "title": "iPhone 13",
         "price": {"amount": "80", "currency_code": "EUR"},
         "item_box": {"first_line": "Apple", "second_line": "128 GB · Gut"},
+        "promoted": True,
     }
     item = parse_catalog_item(raw, "https://www.vinted.at")
     assert (item.brand, item.size, item.condition) == ("Apple", "128 GB", "Gut")
