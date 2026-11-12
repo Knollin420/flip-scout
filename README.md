@@ -98,6 +98,7 @@ cp .env.example .env                     # Telegram token + chat id, Anthropic A
 .venv/bin/python -m flip_scout           # run forever
 ```
 
+- **Windows PC:** [deploy/windows/INSTALL.md](deploy/windows/INSTALL.md)
 - **Android phone as server:** [deploy/termux/INSTALL.md](deploy/termux/INSTALL.md)
 - **Mini-PC / Raspberry Pi:** `docker compose up -d`
 

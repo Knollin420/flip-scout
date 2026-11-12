@@ -11,6 +11,7 @@ import argparse
 import logging
 import random
 import signal
+import socket
 import sys
 import threading
 import time
@@ -53,6 +54,21 @@ def import_seed_searches(cfg: Config, store: Store) -> None:
         log.info("Start-Suche übernommen: %s", name)
 
 
+def acquire_instance_lock(port: int = 47913) -> socket.socket | None:
+    """Only one running bot per computer (two would send every alert twice).
+
+    Holding a local port works the same on Windows, Linux and Android; the OS frees it
+    automatically when the process ends, even after a crash.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind(("127.0.0.1", port))
+    except OSError:
+        sock.close()
+        return None
+    return sock
+
+
 def build(args: argparse.Namespace):
     from .ai import AIChecker
     from .monitor import Monitor
@@ -89,6 +105,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
+    if hasattr(sys.stdout, "reconfigure"):  # Windows consoles: never crash on emojis
+        sys.stdout.reconfigure(errors="replace")
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
     if args.log_file:
         Path(args.log_file).parent.mkdir(parents=True, exist_ok=True)
@@ -125,6 +143,11 @@ def main(argv: list[str] | None = None) -> int:
             result.hits,
         )
         return 1 if result.failed else 0
+
+    lock = acquire_instance_lock()
+    if lock is None:
+        log.error("flip-scout läuft bereits auf diesem Computer – zweiter Start abgebrochen.")
+        return 3
 
     stop = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):

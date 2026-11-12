@@ -1,6 +1,6 @@
 import time
 
-from flip_scout.__main__ import import_seed_searches
+from flip_scout.__main__ import acquire_instance_lock, import_seed_searches
 from flip_scout.bot import TelegramBot, parse_price
 from flip_scout.monitor import Monitor, status_text
 from flip_scout.pipeline import RunResult
@@ -110,3 +110,13 @@ def test_monitor_alarm_recovery_and_heartbeat(cfg, store):
     monitor.maybe_heartbeat()
     assert sum("läuft" in t for t in notifier.texts) == 1
     assert "Status" in status_text(cfg, store)
+
+
+def test_only_one_instance():
+    first = acquire_instance_lock(47999)
+    assert first is not None
+    assert acquire_instance_lock(47999) is None
+    first.close()
+    second = acquire_instance_lock(47999)
+    assert second is not None
+    second.close()
