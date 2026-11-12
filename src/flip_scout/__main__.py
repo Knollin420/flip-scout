@@ -101,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data", help="Datenordner (Standard: ./data)")
     parser.add_argument("--once", action="store_true", help="ein Durchlauf, dann Ende")
     parser.add_argument("--test-notify", action="store_true", help="Telegram-Testnachricht")
+    parser.add_argument("--diagnose", action="store_true", help="Vinted-Verbindung prüfen")
     parser.add_argument("--log-file", help="zusätzlich in Datei loggen (rotiert ab 5 MB)")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -132,6 +133,11 @@ def main(argv: list[str] | None = None) -> int:
         ok = notifier.send_text("🧪 Testnachricht von flip-scout – Telegram funktioniert!")
         log.info("Testnachricht %s", "gesendet" if ok else "FEHLGESCHLAGEN")
         return 0 if ok else 1
+
+    if args.diagnose:
+        from .diagnose import run_diagnose
+
+        return 0 if run_diagnose(pipeline.vinted, cfg.data_dir) else 1
 
     if args.once:
         result = pipeline.run_once()

@@ -161,33 +161,100 @@ def test_description_from_page():
 
 
 class FakeResponse:
-    def __init__(self, status, payload=None):
+    def __init__(self, status, payload=None, text="", headers=None):
         self.status_code = status
         self.payload = payload or {}
+        self.text = text
+        self.headers = headers or {}
 
     def json(self):
         return self.payload
 
 
+class FakeCookies(dict):
+    def clear(self):
+        super().clear()
+
+
 class FakeSession:
     def __init__(self, answers):
         self.answers = list(answers)
-        self.cookies = SimpleNamespace(clear=lambda: None, keys=lambda: ["access_token_web"])
-        self.urls = []
+        self.cookies = FakeCookies()
+        self.requests = []
 
     def get(self, url, **kwargs):
-        self.urls.append(url)
+        self.requests.append((url, kwargs))
         if url.endswith(".at/"):
-            return FakeResponse(200)
+            self.cookies["access_token_web"] = "tok"
+            return FakeResponse(200, text='{"CSRF_TOKEN":"c-1"}', headers={"x-anon-id": "anon-1"})
         return self.answers.pop(0)
 
 
-def test_vinted_refreshes_cookie_once_on_401():
-    session = FakeSession([FakeResponse(401), FakeResponse(200, {"items": [{"id": 1}]})])
+def test_search_uses_svc_catalogue_with_session_headers():
+    session = FakeSession([FakeResponse(200, {"items": [{"id": 1, "path": "/items/1-x"}]})])
     client = VintedClient("https://www.vinted.at", session=session)
-    items = client.search("iphone", {"catalog_ids": "1"})
-    assert [i.id for i in items] == [1]
-    assert session.urls.count("https://www.vinted.at/") == 2  # initial + refresh
+    items = client.search("iphone", {"catalog_ids": "1,2", "status_ids": ""}, price_to=100)
+    url, kwargs = session.requests[-1]
+    assert url == "https://api.vinted.at/svc-catalogue/items"
+    assert kwargs["params"]["attribute_ids[catalog]"] == "1,2"
+    assert "attribute_ids[status]" not in kwargs["params"]  # empty values are dropped
+    assert kwargs["params"]["price_to"] == "100" and "price_from" not in kwargs["params"]
+    headers = kwargs["headers"]
+    assert headers["X-Anon-Id"] == "anon-1" and headers["X-Csrf-Token"] == "c-1"
+    assert headers["Authorization"] == "Bearer tok"
+    assert items[0].url == "https://www.vinted.at/items/1-x"
+
+
+def test_vinted_refreshes_session_and_switches_auth_variant():
+    ok = FakeResponse(200, {"items": [{"id": 1}]})
+    session = FakeSession([FakeResponse(401), FakeResponse(403), ok])
+    client = VintedClient("https://www.vinted.at", session=session)
+    assert [i.id for i in client.search("x", {})] == [1]
+    start_page_calls = [u for u, _ in session.requests if u.endswith(".at/")]
+    assert len(start_page_calls) == 3  # initial + two refreshes
+    assert "Authorization" not in session.requests[-1][1]["headers"]  # switched variant
+
+
+def test_404_is_an_error_not_a_retry():
+    from flip_scout.vinted import VintedError
+
+    session = FakeSession([FakeResponse(404, text="not found")])
+    client = VintedClient("https://www.vinted.at", session=session)
+    with pytest.raises(VintedError, match="404"):
+        client.search("x", {})
+
+
+def test_item_box_fields():
+    raw = {
+        "id": 3,
+        "title": "iPhone 13",
+        "price": {"amount": "80", "currency_code": "EUR"},
+        "item_box": {"first_line": "Apple", "second_line": "128 GB · Gut"},
+    }
+    item = parse_catalog_item(raw, "https://www.vinted.at")
+    assert (item.brand, item.size, item.condition) == ("Apple", "128 GB", "Gut")
+    assert item.url == "https://www.vinted.at/items/3" and item.created_ts is None
+
+
+def test_details_from_item_page():
+    page = (
+        '<script type="application/ld+json">{"@type":"Product","description":"Akku 85 %",'
+        '"image":["https://img/1.jpg","https://img/2.jpg"]}</script>'
+    )
+    session = FakeSession([FakeResponse(200, text=page)])
+    client = VintedClient("https://www.vinted.at", session=session)
+    item = make_item(7, photos=1)
+    client.load_details(item)
+    assert item.description == "Akku 85 %" and item.description_source == "page"
+    assert item.photo_urls == ["https://img/1.jpg", "https://img/2.jpg"]
+
+
+def test_url_import_new_attribute_names():
+    imp = parse_vinted_url(
+        "https://www.vinted.at/catalog?search_text=x"
+        "&attribute_ids[catalog][]=2329&attribute_ids[status][]=6"
+    )
+    assert imp.params == {"catalog_ids": "2329", "status_ids": "6"}
 
 
 def test_network_error_on_cookie_is_a_vinted_error():

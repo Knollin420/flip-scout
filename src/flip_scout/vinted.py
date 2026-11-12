@@ -1,9 +1,13 @@
 """Vinted access via the internal JSON API, without login.
 
-- Fetches the anonymous ``access_token_web`` cookie from the start page.
-- Uses curl_cffi with a Chrome TLS fingerprint.
-- On 401/403: fetch a new cookie once and retry.
-- Description: detail API first, then the public item page (og:description) as fallback.
+Since September 2026 the catalogue search lives on a separate host:
+  GET https://api.vinted.<tld>/svc-catalogue/items
+- Session: one request to the www start page gives the anonymous ``access_token_web``
+  cookie and an anonymous id (``X-Anon-Id`` header or ``anon_id`` cookie).
+- Filters are named ``attribute_ids[catalog]`` etc. instead of ``catalog_ids``.
+- The JSON item detail API is blocked by bot protection, so the description and photos
+  come from the public item page (JSON-LD / OpenGraph tags).
+- curl_cffi with a Chrome TLS fingerprint. On 401/403: new session, then retry.
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
+from urllib.parse import urljoin
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +64,23 @@ def _photo_url(photo: dict) -> str:
     return photo.get("full_size_url") or photo.get("url") or ""
 
 
+# Our stored filter names (as in old browser links) -> svc-catalogue parameter names
+API_PARAM_NAMES = {
+    "catalog_ids": "attribute_ids[catalog]",
+    "brand_ids": "attribute_ids[brand]",
+    "size_ids": "attribute_ids[size]",
+    "status_ids": "attribute_ids[status]",
+    "color_ids": "attribute_ids[color]",
+    "material_ids": "attribute_ids[material]",
+}
+
+
+def api_params(params: dict[str, str]) -> dict[str, str]:
+    """Translates stored filters to the new API names and drops empty values
+    (the API answers 400 for blank parameters)."""
+    return {API_PARAM_NAMES.get(k, k): v for k, v in params.items() if str(v).strip()}
+
+
 def parse_catalog_item(raw: dict, base_url: str) -> Item:
     price, currency = _price(raw.get("price"))
     photo = raw.get("photo") or {}
@@ -67,15 +89,33 @@ def parse_catalog_item(raw: dict, base_url: str) -> Item:
         photos = [_photo_url(photo)]
     ts = (photo.get("high_resolution") or {}).get("timestamp")
     item_id = int(raw["id"])
+    title = raw.get("title") or ""
+
+    # Brand/size/condition: old flat fields, otherwise the new item_box lines
+    box = raw.get("item_box") or {}
+    brand = raw.get("brand_title") or ""
+    size = raw.get("size_title") or ""
+    condition = raw.get("status") if isinstance(raw.get("status"), str) else ""
+    first, second = (box.get("first_line") or "").strip(), (box.get("second_line") or "").strip()
+    if not brand and first and first != title:
+        brand = first
+    if second and not (size or condition):
+        parts = [p.strip() for p in re.split(r"\s+[·•|]\s+", second) if p.strip()]
+        if len(parts) >= 2:
+            size, condition = parts[0], parts[-1]
+        elif parts:
+            condition = parts[0]
+
+    link = raw.get("url") or raw.get("path") or f"/items/{item_id}"
     return Item(
         id=item_id,
-        title=raw.get("title") or "",
+        title=title,
         price=price,
         currency=currency,
-        brand=raw.get("brand_title") or "",
-        size=raw.get("size_title") or "",
-        condition=raw.get("status") or "",
-        url=raw.get("url") or f"{base_url}/items/{item_id}",
+        brand=brand,
+        size=size,
+        condition=condition,
+        url=urljoin(base_url + "/", link),
         photo_urls=photos,
         created_ts=float(ts) if ts else None,
         reserved=bool(raw.get("is_reserved")),
@@ -87,18 +127,42 @@ _OG_DESC = re.compile(r'<meta[^>]+property="og:description"[^>]+content="([^"]*)
 _LD_JSON = re.compile(r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', re.I | re.S)
 
 
-def description_from_page(page: str) -> str:
-    """Extracts the description from the public item page."""
+_OG_IMAGE = re.compile(r'<meta[^>]+property="og:image"[^>]+content="([^"]*)"', re.I)
+_CSRF = re.compile(r'CSRF_TOKEN\\?"\s*:\s*\\?"([^"\\]+)')
+
+
+def _ld_entries(page: str) -> list[dict]:
+    entries: list[dict] = []
     for block in _LD_JSON.findall(page):
         try:
             data = json.loads(block)
         except ValueError:
             continue
-        for entry in data if isinstance(data, list) else [data]:
-            if isinstance(entry, dict) and entry.get("description"):
-                return html.unescape(str(entry["description"])).strip()
+        entries += [e for e in (data if isinstance(data, list) else [data]) if isinstance(e, dict)]
+    return entries
+
+
+def description_from_page(page: str) -> str:
+    """Extracts the description from the public item page."""
+    for entry in _ld_entries(page):
+        if entry.get("description"):
+            return html.unescape(str(entry["description"])).strip()
     match = _OG_DESC.search(page)
     return html.unescape(match.group(1)).strip() if match else ""
+
+
+def photos_from_page(page: str) -> list[str]:
+    """All photo URLs of the item page (JSON-LD image list, else og:image)."""
+    urls: list[str] = []
+    for entry in _ld_entries(page):
+        images = entry.get("image")
+        for img in images if isinstance(images, list) else [images]:
+            url = img.get("url") if isinstance(img, dict) else img
+            if isinstance(url, str) and url.startswith("http") and url not in urls:
+                urls.append(html.unescape(url))
+    if not urls:
+        urls = [html.unescape(u) for u in _OG_IMAGE.findall(page)]
+    return urls
 
 
 def sniff_media_type(data: bytes) -> str | None:
@@ -115,18 +179,27 @@ def sniff_media_type(data: bytes) -> str | None:
 
 class VintedClient:
     MAX_PHOTO_BYTES = 5 * 1024 * 1024  # Anthropic image limit
+    SEARCH_PATH = "/svc-catalogue/items"
 
     def __init__(self, base_url: str, timeout: float = 20.0, session=None):
         self.base_url = base_url.rstrip("/")
+        self.api_url = self.base_url.replace("://www.", "://api.", 1)
         self.timeout = timeout
         if session is None:
             from curl_cffi import requests as cffi_requests
 
             session = cffi_requests.Session(impersonate="chrome")
         self.session = session
-        self._has_cookie = False
+        self._has_session = False
+        self.token = ""
+        self.anon_id = ""
+        self.csrf = ""
+        self.use_bearer = True
+
+    # --- session ----------------------------------------------------------
 
     def refresh_cookie(self) -> None:
+        """Opens the start page like a browser: cookie, anonymous id, CSRF token."""
         self.session.cookies.clear()
         try:
             resp = self.session.get(self.base_url + "/", timeout=self.timeout)
@@ -134,30 +207,64 @@ class VintedClient:
             raise VintedError(f"Startseite nicht erreichbar: {exc}") from exc
         if resp.status_code >= 400:
             raise VintedError(f"Startseite: HTTP {resp.status_code}")
-        if "access_token_web" not in self.session.cookies.keys():
+        cookies = self.session.cookies
+        if "access_token_web" not in cookies.keys():
             raise VintedError("Kein access_token_web-Cookie erhalten (Bot-Schutz?)")
-        self._has_cookie = True
-        log.info("Neues Vinted-Cookie geholt")
+        self.token = cookies.get("access_token_web") or ""
+        headers = getattr(resp, "headers", {}) or {}
+        self.anon_id = headers.get("x-anon-id") or cookies.get("anon_id") or ""
+        match = _CSRF.search(getattr(resp, "text", "") or "")
+        self.csrf = match.group(1) if match else ""
+        self._has_session = True
+        log.info(
+            "Neue Vinted-Sitzung (Anon-ID: %s, CSRF: %s)",
+            "ja" if self.anon_id else "nein",
+            "ja" if self.csrf else "nein",
+        )
 
-    def _get(self, path: str, params: dict | None = None, retry: bool = True):
-        if not self._has_cookie:
-            self.refresh_cookie()
-        try:
-            resp = self.session.get(
-                self.base_url + path,
-                params=params,
-                timeout=self.timeout,
-                headers={"Accept": "application/json, text/plain, */*"},
-            )
-        except Exception as exc:  # network errors from curl_cffi
-            raise VintedError(f"Netzwerkfehler: {exc}") from exc
-        if resp.status_code in (401, 403) and retry:
-            log.info("HTTP %s – hole neues Cookie und versuche erneut", resp.status_code)
-            self._has_cookie = False
-            return self._get(path, params, retry=False)
-        if resp.status_code != 200:
-            raise VintedError(f"{path}: HTTP {resp.status_code}")
-        return resp
+    def api_headers(self) -> dict[str, str]:
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "de-AT,de;q=0.9,en;q=0.8",
+            "Origin": self.base_url,
+            "Referer": self.base_url + "/catalog",
+            "Platform": "web",
+        }
+        if self.anon_id:
+            headers["X-Anon-Id"] = self.anon_id
+        if self.csrf:
+            headers["X-Csrf-Token"] = self.csrf
+        if self.use_bearer and self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return headers
+
+    def _api_get(self, path: str, params: dict | None = None):
+        """GET on the api host. 401/403: new session; still refused: other auth variant."""
+        for attempt in range(3):
+            if not self._has_session:
+                self.refresh_cookie()
+            try:
+                resp = self.session.get(
+                    self.api_url + path,
+                    params=params,
+                    timeout=self.timeout,
+                    headers=self.api_headers(),
+                )
+            except Exception as exc:  # network errors from curl_cffi
+                raise VintedError(f"Netzwerkfehler: {exc}") from exc
+            if resp.status_code in (401, 403) and attempt < 2:
+                log.info("HTTP %s – neue Sitzung und neuer Versuch", resp.status_code)
+                self._has_session = False
+                if attempt == 1:
+                    self.use_bearer = not self.use_bearer
+                continue
+            if resp.status_code != 200:
+                detail = (getattr(resp, "text", "") or "")[:200].replace("\n", " ")
+                raise VintedError(f"{path}: HTTP {resp.status_code} {detail}".strip())
+            return resp
+        raise VintedError(f"{path}: Zugriff verweigert")
+
+    # --- search / details -------------------------------------------------
 
     def search(
         self,
@@ -167,14 +274,14 @@ class VintedClient:
         price_to: float | None = None,
         per_page: int = 48,
     ) -> list[Item]:
-        query = {"page": 1, "per_page": per_page, "order": "newest_first", **params}
+        query = {"page": 1, "per_page": per_page, "order": "newest_first", **api_params(params)}
         if term:
             query["search_text"] = term
         if price_from is not None:
             query["price_from"] = f"{price_from:g}"
         if price_to is not None:
             query["price_to"] = f"{price_to:g}"
-        resp = self._get("/api/v2/catalog/items", query)
+        resp = self._api_get(self.SEARCH_PATH, query)
         try:
             data = resp.json()
         except ValueError as exc:
@@ -182,28 +289,24 @@ class VintedClient:
         return [parse_catalog_item(raw, self.base_url) for raw in data.get("items", [])]
 
     def load_details(self, item: Item) -> None:
-        """Fills description (and full photo list). Never raises."""
-        try:
-            data = self._get(f"/api/v2/items/{item.id}", retry=False).json().get("item") or {}
-            desc = (data.get("description") or "").strip()
-            photos = [_photo_url(p) for p in data.get("photos") or [] if _photo_url(p)]
-            if photos:
-                item.photo_urls = photos
-            if desc:
-                item.description, item.description_source = desc, "api"
-                return
-        except Exception as exc:
-            log.debug("Detail-API für %s nicht verfügbar: %s", item.id, exc)
+        """Description and all photos from the public item page. Never raises."""
         try:
             resp = self.session.get(item.url, timeout=self.timeout)
-            if resp.status_code == 200:
-                desc = description_from_page(resp.text)
-                if desc:
-                    item.description, item.description_source = desc, "page"
-                    return
-            log.info("Keine Beschreibung für %s (HTTP %s)", item.id, resp.status_code)
         except Exception as exc:
             log.info("Anzeigenseite für %s nicht ladbar: %s", item.id, exc)
+            return
+        if resp.status_code != 200:
+            log.info("Keine Beschreibung für %s (HTTP %s)", item.id, resp.status_code)
+            return
+        page = resp.text
+        photos = photos_from_page(page)
+        if len(photos) > len(item.photo_urls):
+            item.photo_urls = photos
+        desc = description_from_page(page)
+        if desc:
+            item.description, item.description_source = desc, "page"
+        else:
+            log.info("Keine Beschreibung auf der Anzeigenseite von %s", item.id)
 
     def download_photo(self, url: str) -> tuple[bytes, str] | None:
         try:

@@ -13,6 +13,14 @@ from urllib.parse import parse_qsl, urlparse
 
 # Browser parameter name -> API parameter name (everything else: strip "[]")
 _RENAME = {"catalog": "catalog_ids"}
+_ATTRIBUTE = {
+    "catalog": "catalog_ids",
+    "brand": "brand_ids",
+    "size": "size_ids",
+    "status": "status_ids",
+    "color": "color_ids",
+    "material": "material_ids",
+}
 # Parameters that belong to the browser session, not to the search itself
 _IGNORE = {
     "order",
@@ -84,6 +92,10 @@ def parse_vinted_url(url: str) -> ImportedSearch:
             continue
         if base in _IGNORE:
             continue
+        # newer links use attribute_ids[catalog] etc. -> store as catalog_ids
+        attr = re.fullmatch(r"attribute_ids\[(\w+)\]", base)
+        if attr:
+            base = _ATTRIBUTE.get(attr.group(1), base)
         name = _RENAME.get(base, base)
         collected.setdefault(name, [])
         if value not in collected[name]:

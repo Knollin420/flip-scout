@@ -33,6 +33,8 @@ Preise anpassen: `notepad profiles.toml` (Abschnitte `max_prices`).
 
 - `--test-notify` → auf Telegram kommt „🧪 Testnachricht“.
 - `--once` → beim ersten Mal merkt sich der Bot nur die aktuellen Anzeigen („erster Lauf – … gemerkt“).
+- Klappt die Suche nicht: `.venv\Scripts\python -m flip_scout --diagnose` prüft die Verbindung
+  Schritt für Schritt und speichert eine Beispielantwort in `data\diagnose-search.json`.
 
 ## 4. Dauerhaft laufen lassen
 
