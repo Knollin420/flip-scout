@@ -41,6 +41,7 @@ class Item:
     created_ts: float | None = None
     reserved: bool = False
     closed: bool = False
+    promoted: bool = False  # paid "bump" – usually an old listing pushed to the top
     description: str = ""
     description_source: str = ""  # "api", "page" or "" (not available)
     photo_cache: dict = field(default_factory=dict, repr=False)  # url -> (bytes, type) | None
@@ -120,6 +121,7 @@ def parse_catalog_item(raw: dict, base_url: str) -> Item:
         created_ts=float(ts) if ts else None,
         reserved=bool(raw.get("is_reserved")),
         closed=bool(raw.get("is_closed") or raw.get("is_hidden")),
+        promoted=bool(raw.get("promoted")),
     )
 
 
@@ -229,6 +231,7 @@ class VintedClient:
             "Origin": self.base_url,
             "Referer": self.base_url + "/catalog",
             "Platform": "web",
+            "Locale": "de-AT",
         }
         if self.anon_id:
             headers["X-Anon-Id"] = self.anon_id

@@ -201,7 +201,7 @@ def test_search_uses_svc_catalogue_with_session_headers():
     assert kwargs["params"]["price_to"] == "100" and "price_from" not in kwargs["params"]
     headers = kwargs["headers"]
     assert headers["X-Anon-Id"] == "anon-1" and headers["X-Csrf-Token"] == "c-1"
-    assert headers["Authorization"] == "Bearer tok"
+    assert headers["Authorization"] == "Bearer tok" and headers["Locale"] == "de-AT"
     assert items[0].url == "https://www.vinted.at/items/1-x"
 
 
@@ -234,6 +234,7 @@ def test_item_box_fields():
     item = parse_catalog_item(raw, "https://www.vinted.at")
     assert (item.brand, item.size, item.condition) == ("Apple", "128 GB", "Gut")
     assert item.url == "https://www.vinted.at/items/3" and item.created_ts is None
+    assert item.promoted
 
 
 def test_details_from_item_page():

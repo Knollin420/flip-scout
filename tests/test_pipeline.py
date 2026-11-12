@@ -64,6 +64,9 @@ def test_free_filters_cost_nothing(env, store):
         make_item(2, "iPhone 13 Hülle", price=10),  # exclude word in title
         make_item(3, "iPhone 13 Pro", price=500),  # above max price
     ]
+    promoted = make_item(4, "iPhone 13 Pro", price=100)
+    promoted.promoted = True  # bumped old listing
+    vinted.results["iphone defekt"].append(promoted)
     pipe.run_once()
     assert ai.calls == [] and notifier.hits == [] and vinted.downloads == []
 

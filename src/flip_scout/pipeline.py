@@ -153,6 +153,8 @@ class Pipeline:
             return self._skip(search, item, f"zu alt ({age:.0f} min)")
         if item.reserved or item.closed:
             return self._skip(search, item, "reserviert/verkauft")
+        if item.promoted:
+            return self._skip(search, item, "beworbene (hochgeschobene) Anzeige")
         min_price = search.min_price if search.min_price is not None else profile.min_price
         if min_price is not None and item.price < min_price:
             return self._skip(search, item, f"unter Mindestpreis {min_price:.0f} €")
