@@ -1,0 +1,139 @@
+# flip-scout – Einstellungen und Profile
+# Kopieren nach profiles.toml und anpassen. Nach Änderungen: Bot neu starten
+# (pkill -f flip_scout – die Startschleife startet ihn automatisch neu).
+#
+# Suchen selbst verwaltest du per Telegram (Vinted-Link an den Bot schicken).
+# Profile legen fest, WIE eine Anzeige geprüft wird.
+
+[settings]
+domain = "at"                 # vinted.at
+interval_minutes = 5          # nicht kleiner als 5 (Bot-Schutz)
+max_age_minutes = 60          # ältere Anzeigen werden ignoriert
+heartbeat_hour = 9            # tägliche "läuft"-Meldung (Ortszeit)
+alarm_after_failed_runs = 3   # "Vinted blockiert evtl."-Alarm
+timezone = "Europe/Vienna"
+
+[ai]
+enabled = true
+model = "claude-haiku-5-5"
+max_images = 3                # Fotos pro Anzeige im Foto-Check (volle Auflösung)
+max_checks_per_day = 3000     # Kostenbremse: KI-Aufrufe pro Tag
+price_input_per_mtok = 0.10   # nur für die Kostenanzeige in /status (USD)
+price_output_per_mtok = 0.50
+
+
+# ---------------------------------------------------------------------------
+# PROFILE
+# Felder (alle optional):
+#   label, emoji        Anzeige in Telegram
+#   exclude             Ausschlusswörter NUR im Titel (Teilwort, z.B. "hülle")
+#   exclude_desc        Ausschlusswörter in Titel UND Beschreibung (z.B. "ich suche").
+#                       Vorsicht: "inkl. Hülle" steht oft in guten Angeboten!
+#   must_include        ALLE müssen vorkommen  -> sofort Treffer
+#   any_include         EINES muss vorkommen   -> sofort Treffer
+#   min_price           Mindestpreis in €
+#   ai_check            Was die KI prüfen soll, wenn keine Stichwörter passen.
+#                       Leer = jede Anzeige, die die Filter besteht, ist ein Treffer.
+#   briefing            KI-Kurzbriefing mit Fotos bei Treffern (Standard: true)
+#   ok_defects          Defekte, die okay sind
+#   no_go               Ausschlussgründe (nur wenn klar erkennbar)
+#   check_icloud        iCloud-/Aktivierungssperre prüfen
+#   max_prices          Höchstpreis pro Modell. Die KI ordnet exakt einem Schlüssel zu.
+#                       Modell nicht in der Tabelle -> nur Treffer, wenn die Suche
+#                       einen Höchstpreis hat.
+# ---------------------------------------------------------------------------
+
+[profile.standard]
+label = "Normal"
+emoji = "🛍"
+exclude = ["hülle", "case", "tasche", "nur ovp", "leere ovp", "ovp leer", "nur karton", "defekt", "kaputt", "bastler", "ersatzteil"]
+exclude_desc = ["ich suche", "nur tausch", "nur karton", "nur die ovp"]
+briefing = true
+
+[profile.iphone_defekt]
+label = "iPhone defekt"
+emoji = "📱"
+min_price = 30
+exclude = ["hülle", "case", "panzerglas", "schutzglas", "ladekabel", "netzteil", "nur gehäuse", "leergehäuse", "backcover", "akku für"]
+exclude_desc = ["ich suche", "attrappe", "dummy", "nur tausch"]
+any_include = []
+ai_check = "Defektes oder beschädigtes Apple iPhone zum Reparieren und Weiterverkaufen. Nur echte Geräte, kein Zubehör, keine Einzelteile."
+ok_defects = ["Display gesprungen", "Display/Touch defekt", "Rückglas gesprungen", "Akku schwach/defekt", "Kamera defekt", "Kameraglas gesprungen", "Kratzer", "Dellen am Rahmen", "Lautsprecher/Mikrofon defekt", "Ladebuchse defekt"]
+no_go = ["Wasserschaden", "Board-/Platinendefekt", "geht nicht an / kein Bild und keine Reaktion", "Face ID defekt", "ausgeschlachtet / Teile fehlen", "Bootloop", "nur Teile / Gehäuse"]
+check_icloud = true
+
+[profile.iphone_defekt.max_prices]
+# Beispielwerte! An deine Ankaufpreise anpassen.
+"iPhone 11" = 60
+"iPhone 11 Pro" = 80
+"iPhone 11 Pro Max" = 90
+"iPhone 12" = 90
+"iPhone 12 mini" = 70
+"iPhone 12 Pro" = 120
+"iPhone 12 Pro Max" = 140
+"iPhone 13" = 130
+"iPhone 13 mini" = 110
+"iPhone 13 Pro" = 180
+"iPhone 13 Pro Max" = 210
+"iPhone 14" = 170
+"iPhone 14 Plus" = 180
+"iPhone 14 Pro" = 250
+"iPhone 14 Pro Max" = 290
+"iPhone 15" = 250
+"iPhone 15 Plus" = 270
+"iPhone 15 Pro" = 340
+"iPhone 15 Pro Max" = 400
+"iPhone 16" = 330
+"iPhone 16 Pro" = 450
+"iPhone 16 Pro Max" = 520
+
+[profile.macbook_defekt]
+label = "MacBook defekt"
+emoji = "💻"
+min_price = 50
+exclude = ["hülle", "case", "sleeve", "tasche", "netzteil", "ladekabel", "folie", "skin", "tastaturabdeckung", "keyboard cover"]
+exclude_desc = ["ich suche", "nur tausch"]
+ai_check = "Defektes oder beschädigtes Apple MacBook (Air/Pro) zum Reparieren und Weiterverkaufen. Nur komplette Geräte, kein Zubehör."
+ok_defects = ["Display gesprungen/defekt", "Tastatur defekt", "Akku schwach/defekt", "Gehäuse verbeult/zerkratzt", "Trackpad defekt", "Lautsprecher defekt"]
+no_go = ["Logicboard-Defekt", "startet nicht / kein Lebenszeichen", "Firmware-/EFI-Passwort-Sperre", "MDM-/Firmensperre", "ohne SSD / ohne Speicher", "ausgeschlachtet"]
+check_icloud = true
+
+[profile.macbook_defekt.max_prices]
+# Beispielwerte! An deine Ankaufpreise anpassen.
+"MacBook Air M1" = 250
+"MacBook Air M2" = 380
+"MacBook Air M3" = 480
+"MacBook Pro 13 M1" = 300
+"MacBook Pro 13 M2" = 400
+"MacBook Pro 14 M1 Pro/Max" = 550
+"MacBook Pro 16 M1 Pro/Max" = 650
+"MacBook Air Intel" = 90
+"MacBook Pro Intel" = 120
+
+
+# ---------------------------------------------------------------------------
+# START-SUCHEN (optional)
+# Werden beim ersten Start einmalig in die Datenbank übernommen (wenn es noch
+# keine Suche mit diesem Namen gibt). Danach verwaltest du alles per Telegram.
+#   url    = Browser-Link von vinted.at (Filter wie Kategorie, Marke, Zustand)
+#   terms  = zusätzliche Suchbegriffe mit denselben Filtern
+# ---------------------------------------------------------------------------
+
+[[search]]
+name = "iPhone defekt"
+profile = "iphone_defekt"
+terms = ["iphone defekt", "iphone display kaputt", "iphone bastler", "iphone displayschaden"]
+max_price = 450
+
+[[search]]
+name = "MacBook defekt"
+profile = "macbook_defekt"
+terms = ["macbook defekt", "macbook display kaputt", "macbook bastler", "macbook wasserschaden"]
+max_price = 650
+
+[[search]]
+name = "Switch OLED"
+profile = "standard"
+terms = ["switch oled"]
+max_price = 180
+min_price = 80

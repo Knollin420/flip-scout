@@ -1,0 +1,11 @@
+# Mini-PC / Raspberry Pi:  docker compose up -d   ·  Logs: docker compose logs -f
+services:
+  flip-scout:
+    build: .
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Vienna
+    volumes:
+      - ./profiles.toml:/config/profiles.toml:ro
+      - ./.env:/config/.env:ro
+      - ./data:/data
