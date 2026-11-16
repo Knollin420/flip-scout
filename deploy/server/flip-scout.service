@@ -1,0 +1,29 @@
+# systemd service for flip-scout on a Linux server.
+# Install: cp deploy/server/flip-scout.service /etc/systemd/system/
+#          systemctl daemon-reload && systemctl enable --now flip-scout
+[Unit]
+Description=flip-scout – Vinted alert bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=flipscout
+Group=flipscout
+WorkingDirectory=/opt/flip-scout
+ExecStart=/opt/flip-scout/.venv/bin/python -m flip_scout --log-file /opt/flip-scout/data/flip-scout.log
+Restart=always
+RestartSec=30
+Environment=PYTHONUNBUFFERED=1
+# Normal log goes to data/flip-scout.log; crashes (stderr) to the journal
+StandardOutput=null
+
+# Isolation: the bot can only write to its own folder and cannot see /root or /home
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/flip-scout
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

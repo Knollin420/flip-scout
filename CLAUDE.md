@@ -27,7 +27,10 @@ Code, Commits und README auf Englisch.
   `--once` erfolgreich (Erst-Lauf hat 9 Suchbegriffe gemerkt).
 - Server: geklont nach `/opt/flip-scout`, venv installiert, `profiles.toml` aus der
   Vorlage kopiert, **`--diagnose` komplett grün** (Vinted akzeptiert die Server-IP).
-- `.env` auf dem Server noch **nicht** angelegt.
+- Das Uni-Tool liegt in `/root/tuwel` (vermutlich per Cron). Nicht anfassen.
+  Weitere Dienste: apache2, exim4, xinetd (Standard des Hosters), ebenfalls nicht anfassen.
+- Dienstdatei und Anleitung: `deploy/server/` (systemd, Benutzer `flipscout`,
+  ProtectSystem/ProtectHome). Updates als `flipscout`: `sudo -u flipscout git pull`.
 
 ## Nächste Schritte
 
