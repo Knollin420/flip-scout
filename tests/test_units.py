@@ -269,3 +269,57 @@ def test_network_error_on_cookie_is_a_vinted_error():
     client = VintedClient("https://www.vinted.at", session=Broken([]))
     with pytest.raises(VintedError):
         client.search("x", {})
+
+
+def _flight_page(*photo_lists, ld_image=""):
+    """Item page like vinted.at: JSON-LD with the main photo, photo lists escaped in
+    the embedded Next.js data."""
+    ld = (
+        '<script type="application/ld+json">{"@type":"Product","image":"' + ld_image + '"}</script>'
+        if ld_image
+        else ""
+    )
+    pushes = "".join(
+        "<script>self.__next_f.push([1,"
+        + json.dumps(json.dumps({"item": {"photos": [{"url": u, "is_main": False} for u in urls]}}))
+        + "])</script>"
+        for urls in photo_lists
+    )
+    return ld + pushes
+
+
+def test_all_photos_from_embedded_page_data():
+    own = [f"https://images1.vinted.net/t/0{n}_own{n}/f800/a.webp?s=x" for n in range(5)]
+    other = ["https://images1.vinted.net/t/09_other/f800/b.webp?s=y"] * 6
+    page = _flight_page(other, own, ld_image=own[0])
+    from flip_scout.vinted import photos_from_page
+
+    assert photos_from_page(page) == own  # list of a similar item is never used
+
+
+def test_embedded_photos_need_matching_main_photo():
+    from flip_scout.vinted import photos_from_page
+
+    other = [f"https://images1.vinted.net/t/0{n}_other/f800/b.webp" for n in range(4)]
+    main = "https://images1.vinted.net/t/01_main/f800/a.webp"
+    assert photos_from_page(_flight_page(other, ld_image=main)) == [main]
+    assert photos_from_page(_flight_page(other)) == []  # no main photo -> trust nothing
+
+
+def test_search_full_size_photo_is_kept_with_page_photos():
+    # search: only the main photo, as signed 1200x1600 full_size_url
+    main_full = "https://images1.vinted.net/tc/01_main/abc.webp?s=big"
+    # page: all photos, but only as 800 px versions
+    page_photos = [
+        "https://images1.vinted.net/t/01_main/f800/abc.webp?s=small",
+        "https://images1.vinted.net/t/02_second/f800/def.webp?s=x",
+        "https://images1.vinted.net/t/03_third/f800/ghi.webp?s=y",
+    ]
+    page = _flight_page(page_photos, ld_image=page_photos[0])
+    client = VintedClient(
+        "https://www.vinted.at", session=FakeSession([FakeResponse(200, text=page)])
+    )
+    item = make_item(8, photos=0)
+    item.photo_urls = [main_full]
+    client.load_details(item)
+    assert item.photo_urls == [main_full, *page_photos[1:]]

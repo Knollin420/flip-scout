@@ -153,8 +153,46 @@ def description_from_page(page: str) -> str:
     return html.unescape(match.group(1)).strip() if match else ""
 
 
+# "photos":[ ... ] inside the page's embedded Next.js data, usually as an escaped
+# JSON string (\"photos\":[...]), sometimes plain.
+_EMBEDDED_PHOTOS = re.compile(r'(\\?)"photos\1"\s*:\s*\[')
+_IMAGE_ID = re.compile(r"vinted\.net/tc?/([^/?]+)/")
+
+
+def _image_id(url: str) -> str:
+    match = _IMAGE_ID.search(url)
+    return match.group(1) if match else ""
+
+
+def _embedded_photo_lists(page: str):
+    """Yields each embedded photos array as a list of URLs."""
+    for match in _EMBEDDED_PHOTOS.finditer(page):
+        start = match.end() - 1
+        depth = 0
+        for end in range(start, min(len(page), start + 200_000)):
+            depth += {"[": 1, "]": -1}.get(page[end], 0)
+            if depth == 0:
+                break
+        else:
+            continue
+        chunk = page[start : end + 1]
+        try:
+            if match.group(1):  # escaped: decode the JS string content first
+                chunk = json.loads(f'"{chunk}"')
+            photos = json.loads(chunk)
+        except ValueError:
+            continue
+        if isinstance(photos, list):
+            yield [u for p in photos if isinstance(p, dict) and (u := _photo_url(p))]
+
+
 def photos_from_page(page: str) -> list[str]:
-    """All photo URLs of the item page (JSON-LD image list, else og:image)."""
+    """All photo URLs of the item page.
+
+    JSON-LD and og:image only name the main photo. The full list is in the embedded
+    page data; it is used only if it starts with that same main photo, so photos of
+    "similar items" on the page can never be mixed in.
+    """
     urls: list[str] = []
     for entry in _ld_entries(page):
         images = entry.get("image")
@@ -164,7 +202,25 @@ def photos_from_page(page: str) -> list[str]:
                 urls.append(html.unescape(url))
     if not urls:
         urls = [html.unescape(u) for u in _OG_IMAGE.findall(page)]
+    main = _image_id(urls[0]) if urls else ""
+    if main:
+        for embedded in _embedded_photo_lists(page):
+            if embedded and _image_id(embedded[0]) == main:
+                return embedded if len(embedded) > len(urls) else urls
     return urls
+
+
+def merge_photos(known: list[str], page: list[str]) -> list[str]:
+    """Combines the photos from the search with those from the item page.
+
+    The page lists all photos, but only as 800 px versions (f800). The search has just
+    the main photo, but as signed full_size_url (1200x1600). So the page order is used
+    and every photo the search already has keeps its larger search URL.
+    """
+    if len(page) <= len(known):
+        return known
+    by_id = {image_id: url for url in known if (image_id := _image_id(url))}
+    return [by_id.get(_image_id(url), url) if _image_id(url) else url for url in page]
 
 
 def sniff_media_type(data: bytes) -> str | None:
@@ -302,9 +358,7 @@ class VintedClient:
             log.info("Keine Beschreibung für %s (HTTP %s)", item.id, resp.status_code)
             return
         page = resp.text
-        photos = photos_from_page(page)
-        if len(photos) > len(item.photo_urls):
-            item.photo_urls = photos
+        item.photo_urls = merge_photos(item.photo_urls, photos_from_page(page))
         desc = description_from_page(page)
         if desc:
             item.description, item.description_source = desc, "page"
