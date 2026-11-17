@@ -22,31 +22,30 @@ Code, Commits und README auf Englisch.
 
 ## Stand (November 2026)
 
-- Code fertig, 48 Offline-Tests (`pytest`), CI auf GitHub (Knollin420/flip-scout).
-- Windows-PC: Bot installiert in `C:\Users\anonym\flip-scout`, Telegram-Test und
-  `--once` erfolgreich (Erst-Lauf hat 9 Suchbegriffe gemerkt).
-- Server: geklont nach `/opt/flip-scout`, venv installiert, `profiles.toml` aus der
-  Vorlage kopiert, **`--diagnose` komplett grün** (Vinted akzeptiert die Server-IP).
+- Code fertig, Offline-Tests (`pytest`), CI auf GitHub (Knollin420/flip-scout).
+- Server (1blu-VPS): Bot läuft **nur noch hier** in `/opt/flip-scout` als Benutzer
+  `flipscout`, systemd-Dienst `flip-scout` (Dienstdatei und Anleitung in `deploy/server/`,
+  ProtectSystem/ProtectHome). `.env`, `profiles.toml` und `data/` vom PC übernommen,
+  `--diagnose` und `--test-notify` grün. Updates als `flipscout`: `sudo -u flipscout git pull`.
+- Windows-PC: Bot beendet und gelöscht.
+- Die 3 Start-Suchen (iPhone defekt, MacBook defekt, Switch OLED) sind in Telegram pausiert.
+  `max_prices` in `profiles.toml` sind noch Beispielwerte.
 - Das Uni-Tool liegt in `/root/tuwel` (vermutlich per Cron). Nicht anfassen.
   Weitere Dienste: apache2, exim4, xinetd (Standard des Hosters), ebenfalls nicht anfassen.
-- Dienstdatei und Anleitung: `deploy/server/` (systemd, Benutzer `flipscout`,
-  ProtectSystem/ProtectHome). Updates als `flipscout`: `sudo -u flipscout git pull`.
+- Claude Code läuft auf dem Server als root (`claude remote-control` in tmux, Sitzung
+  `claude`). Befehle für den Bot als `flipscout` ausführen (`sudo -u flipscout ...`),
+  danach Rechte prüfen (`chown -R flipscout:flipscout /opt/flip-scout`, `.env` 600).
 
 ## Nächste Schritte
 
-1. `.env` auf dem Server anlegen (Werte vom Besitzer; er trägt sie selbst ein, z. B. mit
-   `nano`, und zeigt sie nicht im Chat). `--test-notify` testen.
-2. Benutzer `flipscout` anlegen, `/opt/flip-scout` ihm übergeben.
-3. systemd-Dienst: `ExecStart=/opt/flip-scout/.venv/bin/python -m flip_scout
-   --log-file /opt/flip-scout/data/flip-scout.log`, `WorkingDirectory=/opt/flip-scout`,
-   `User=flipscout`, `Restart=always`, `RestartSec=30`. Dienstdatei als
-   `deploy/server/flip-scout.service` ins Repo, Anleitung `deploy/server/INSTALL.md`.
-4. Bot auf dem Windows-PC stoppen und Autostart dort nicht einrichten.
-5. Offener Punkt: pro Anzeige wird nur 1 Foto gefunden (KI sollte bis zu 3 bekommen).
-   Ursache prüfen: Die Suchantwort hat ein Feld `photos`. Prüfen, ob dort mehrere Fotos
-   stehen, und ob die Anzeigenseite mehr als `og:image` hergibt.
-   (`--diagnose` speichert eine Beispielantwort in `data/diagnose-search.json`.)
-6. Später: Web-Dashboard (Trefferhistorie, Kosten), das der Besitzer sich gewünscht hat.
+1. Pausieren per Telegram wirkte erst nach Ende eines langen Durchlaufs. Fix: Die Pipeline
+   prüft vor jeder Anzeige, ob die Suche noch aktiv ist.
+2. Pro Anzeige wird nur 1 Foto gefunden (KI sollte bis zu 3 bekommen). JSON-LD/og:image
+   nennen nur das Hauptfoto; alle Fotos stehen in den eingebetteten Next.js-Daten der
+   Anzeigenseite. (`--diagnose` speichert eine Beispielantwort in `data/diagnose-search.json`.)
+3. Mit dem Besitzer: Preistabellen in `profiles.toml`, Suchen einrichten (u. a. Mini-PCs
+   per Vinted-Link), dann Dienst dauerhaft laufen lassen (`systemctl enable --now flip-scout`).
+4. Später: Web-Dashboard (Trefferhistorie, Kosten), das der Besitzer sich gewünscht hat.
 
 ## Vinted-Schnittstelle (Stand September 2026)
 

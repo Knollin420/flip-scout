@@ -385,10 +385,12 @@ class TelegramBot:
             self.show(message, *self.search_view(i))
         elif action == "p":
             self.store.update_search(i, active=not s.active)
+            log.info("Telegram: Suche %r %s", s.name, "pausiert" if s.active else "fortgesetzt")
             self.show(message, *self.search_view(i))
             return "Pausiert" if s.active else "Läuft wieder"
         elif action == "hp":  # pause button under a hit message
             self.store.update_search(i, active=False)
+            log.info("Telegram: Suche %r pausiert (Knopf unter Treffer)", s.name)
             return f"⏸ „{s.name}“ pausiert – /menu zum Fortsetzen"
         elif action == "pr":
             self.awaiting = ("price", i)
@@ -445,6 +447,7 @@ class TelegramBot:
             )
         elif action == "dd":
             self.store.delete_search(i)
+            log.info("Telegram: Suche %r gelöscht", s.name)
             self.show(message, *self.menu())
             return "Gelöscht"
         return None

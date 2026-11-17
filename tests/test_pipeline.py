@@ -212,3 +212,37 @@ def test_long_pause_only_remembers_again(env, store, cfg):
     assert pipe.run_once().hits == 0  # after 8 h pause: only remembered
     vinted.results["s"].insert(0, make_item(3))
     assert pipe.run_once().hits == 1  # really new -> reported
+
+
+def test_all_paused_reseeds_only_after_resume(env, store, cfg):
+    cfg.profiles["standard"].briefing = False
+    pipe, vinted, _, _ = env()
+    sid = store.add_search("S", "standard", ["s"])
+    pipe.run_once()  # first run: remember
+    store.update_search(sid, active=False)
+    store.set("last_search_ts", str(float(store.get("last_search_ts")) - 8 * 3600))
+    assert pipe.reseed_after_pause() is False  # all paused: nothing to do, no log spam
+    vinted.results["s"] = [make_item(1), make_item(2)]  # uploaded while paused
+    store.update_search(sid, active=True)
+    assert pipe.run_once().hits == 0  # after resume: only remembered
+    vinted.results["s"].insert(0, make_item(3))
+    assert pipe.run_once().hits == 1  # really new -> reported
+
+
+def test_pause_during_run_stops_remaining_hits(env, store, cfg):
+    cfg.profiles["standard"].briefing = False
+    pipe, vinted, _, notifier = env()
+    sid = store.add_search("Switch", "standard", ["switch oled"])
+    pipe.run_once()
+    vinted.results["switch oled"] = [make_item(n) for n in range(1, 6)]
+    original = notifier.send_hit
+
+    def send_and_pause(*args, **kwargs):
+        ok = original(*args, **kwargs)
+        store.update_search(sid, active=False)  # "⏸ Suche pausieren" pressed
+        return ok
+
+    notifier.send_hit = send_and_pause
+    assert pipe.run_once().hits == 1  # the other 4 are not sent anymore
+    store.update_search(sid, active=True)
+    assert pipe.run_once().hits == 0  # and not later either

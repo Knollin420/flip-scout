@@ -80,6 +80,10 @@ class Pipeline:
     def _pause(self, bounds: tuple[float, float]) -> None:
         self.sleep(self.rand(*bounds))
 
+    def _still_active(self, search_id: int) -> bool:
+        current = self.store.get_search(search_id)
+        return current is not None and current.active
+
     # --- run --------------------------------------------------------------
 
     def reseed_after_pause(self) -> bool:
@@ -91,6 +95,10 @@ class Pipeline:
             return False
         pause = self.now() - float(last)
         if pause <= self.cfg.settings.max_age_minutes * 60:
+            return False
+        if not self.store.list_searches(active_only=True):
+            # Everything paused: nothing to search, so nothing to remember yet. The
+            # reseed happens in the first run after a search is resumed.
             return False
         for search in self.store.list_searches():
             self.store.reset_seeding(search.id)
@@ -106,6 +114,8 @@ class Pipeline:
             price_from = search.min_price if search.min_price is not None else profile.min_price
             candidates: list[Item] = []
             for term in search.terms:
+                if not self._still_active(search.id):
+                    break
                 if not first_request:
                     self._pause(self.cfg.settings.pause_between_searches)
                 first_request = False
@@ -140,7 +150,16 @@ class Pipeline:
                         self.store.mark_seen(search.id, item.id)
                         candidates.append(item)
 
-            for item in candidates:
+            for n, item in enumerate(candidates):
+                # Paused or deleted via Telegram while this run is busy: stop right away.
+                # The remaining listings stay "seen", so they are not reported later either.
+                if not self._still_active(search.id):
+                    log.info(
+                        "[%s] pausiert/gelöscht – %d weitere Anzeigen übersprungen",
+                        search.name,
+                        len(candidates) - n,
+                    )
+                    break
                 result.new_items += 1
                 try:
                     if self.process(search, profile, item):
