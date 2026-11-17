@@ -99,9 +99,9 @@ def test_ai_flow_text_then_photos_and_message(env, store):
         "❓ iCloud: unklar – Verkäufer fragen!",
         "✅ Face ID geht laut Text",
         "❓ Wasserschaden nicht erwähnt",
-        "💡 Fairer Preis",
     ):
         assert part in msg
+    assert "💡" not in msg  # no price assessment
     assert notifier.photos[0] is not None  # photo uploaded with the message
     assert len(vinted.downloads) == 3  # photos downloaded once, reused for Telegram
 

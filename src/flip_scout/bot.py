@@ -11,7 +11,7 @@ import re
 import threading
 import time
 
-from .config import Config
+from .config import Config, Profile
 from .monitor import status_text
 from .notify import TelegramAPI, TelegramError
 from .store import Search, Store
@@ -38,13 +38,39 @@ FILTER_NAMES = {
     "material_ids": "Material",
 }
 
+# Names for known Vinted IDs (vinted.at). Unknown IDs are shown as numbers.
+CATALOG_NAMES = {
+    "3025": "Spielkonsolen",
+    "3580": "Laptops",
+    "3581": "Desktop-PCs",
+    "3602": "Grafikkarten",
+    "3603": "Arbeitsspeicher (RAM)",
+    "3661": "Mobiltelefone",
+}
+BRAND_NAMES = {"54661": "Apple", "77600": "Nintendo"}
+ID_NAMES = {"catalog_ids": CATALOG_NAMES, "brand_ids": BRAND_NAMES}
+
+
+def filter_text(params: dict) -> str:
+    """'catalog_ids=3661, brand_ids=54661' -> 'Kategorie: Mobiltelefone · Marke: Apple'."""
+    parts = []
+    for key, value in params.items():
+        names = ID_NAMES.get(key, {})
+        ids = [v.strip() for v in str(value).split(",") if v.strip()]
+        shown = ", ".join(names.get(v, v) for v in ids) if names else f"{len(ids)} gewählt"
+        parts.append(f"{FILTER_NAMES.get(key, key)}: {shown}")
+    return " · ".join(parts) or "keine"
+
 
 def _btn(text: str, data: str) -> dict:
     return {"text": text, "callback_data": data}
 
 
-def price_text(search: Search) -> str:
+def price_text(search: Search, profile: Profile | None = None) -> str:
     lo, hi = search.min_price, search.max_price
+    if hi is None and profile and profile.max_prices:
+        top = f"laut Preisliste, max. {max(profile.max_prices.values()):g} €"
+        return f"ab {lo:g} €, {top}" if lo is not None else top
     if lo is not None and hi is not None:
         return f"{lo:g}–{hi:g} €"
     if hi is not None:
@@ -218,7 +244,7 @@ class TelegramBot:
                 f"vinted.{self.cfg.settings.domain}. Kategorie-IDs können abweichen."
             )
         preview = Search(id=0, name=name, max_price=imp.price_to, min_price=imp.price_from)
-        filters = ", ".join(FILTER_NAMES.get(k, k) for k in imp.params) or "keine"
+        filters = filter_text(imp.params)
         buttons = [
             [_btn(f"{p.emoji} {p.label}", f"np:{pending_id}:{key}")]
             for key, p in self.cfg.profiles.items()
@@ -246,7 +272,7 @@ class TelegramBot:
             self.store.update_search(search_id, **fields)
             self.store.reset_seeding(search_id)
             search = self.store.get_search(search_id)
-            self.send(f"✅ Preis: {price_text(search)}")
+            self.send(f"✅ Preis: {price_text(search, self.cfg.profile(search.profile))}")
         elif action == "filter":
             link = find_vinted_link(text)
             if not link or not is_catalog_link(link):
@@ -289,7 +315,7 @@ class TelegramBot:
         for i, s in enumerate(searches, start=1):
             p = self.cfg.profile(s.profile)
             state = "✅" if s.active else "⏸"
-            lines.append(f"{i}. {p.emoji} {s.name} {state} · {price_text(s)}")
+            lines.append(f"{i}. {p.emoji} {s.name} {state} · {price_text(s, p)}")
             row.append(_btn(f"{i}. {s.name}"[:30], f"s:{s.id}"))
             if len(row) == 2:
                 buttons.append(row)
@@ -305,16 +331,13 @@ class TelegramBot:
         if not s:
             return self.menu()
         p = self.cfg.profile(s.profile)
-        terms = " · ".join(t for t in s.terms if t) or "(nur Filter)"
-        filters = (
-            ", ".join(
-                f"{FILTER_NAMES.get(k, k)} ({len(v.split(','))})" for k, v in s.params.items()
-            )
-            or "keine"
+        terms = " · ".join(t for t in s.terms if t) or (
+            "keine (nur Kategorie/Filter)" if s.params else "keine"
         )
         text = (
             f"{p.emoji} {s.name} – {'✅ aktiv' if s.active else '⏸ pausiert'}\n"
-            f"Art: {p.label}\nBegriffe: {terms}\nPreis: {price_text(s)}\nFilter: {filters}"
+            f"Art: {p.label}\nSuchwörter: {terms}\nPreis: {price_text(s, p)}\n"
+            f"Filter: {filter_text(s.params)}"
         )
         i = s.id
         buttons = [
@@ -330,7 +353,24 @@ class TelegramBot:
             [_btn("✏️ Name", f"n:{i}"), _btn("🔄 Art", f"pf:{i}"), _btn("🗑 Löschen", f"d:{i}")],
             [_btn("⬅️ Alle Suchen", "m")],
         ]
+        if p.max_prices:
+            buttons.insert(1, [_btn("📋 Preisliste", f"pl:{i}")])
         return text, buttons
+
+    def price_list_view(self, search_id: int) -> tuple[str, list[list[dict]]]:
+        s = self.store.get_search(search_id)
+        if not s:
+            return self.menu()
+        p = self.cfg.profile(s.profile)
+        lines = [f"📋 Preisliste „{p.label}“ (Höchstpreise):"]
+        lines += [f"• {model}: {price:g} €" for model, price in p.max_prices.items()]
+        lines.append("\nModelle, die nicht in der Liste stehen, werden nicht gemeldet.")
+        if s.max_price is not None:
+            lines.append(
+                f"⚠️ Diese Suche hat einen eigenen Höchstpreis ({s.max_price:g} €). Damit "
+                "werden auch Modelle gemeldet, die nicht in der Liste stehen."
+            )
+        return "\n".join(lines), [[_btn("⬅️ Zurück", f"s:{search_id}")]]
 
     # --- buttons ----------------------------------------------------------
 
@@ -374,7 +414,7 @@ class TelegramBot:
         self.show(
             message,
             f"✅ Gespeichert: {profile.emoji} {search.name}\nArt: {profile.label} · "
-            f"{price_text(search)}\n\nAb dem nächsten Durchlauf melde ich neue Angebote.",
+            f"{price_text(search, profile)}\n\nAb dem nächsten Durchlauf melde ich neue Angebote.",
             [[_btn("⚙️ Bearbeiten", f"s:{search_id}"), _btn("✏️ Name ändern", f"n:{search_id}")]],
         )
         return "Gespeichert"
@@ -392,12 +432,25 @@ class TelegramBot:
             self.store.update_search(i, active=False)
             log.info("Telegram: Suche %r pausiert (Knopf unter Treffer)", s.name)
             return f"⏸ „{s.name}“ pausiert – /menu zum Fortsetzen"
+        elif action == "pl":
+            self.show(message, *self.price_list_view(i))
         elif action == "pr":
             self.awaiting = ("price", i)
-            self.send(
-                f"💶 Aktuell: {price_text(s)}\nNeuer Höchstpreis? z.B. 160\n"
-                "Oder Mindest- und Höchstpreis: 30-160 · 0 = ohne Grenze"
-            )
+            p = self.cfg.profile(s.profile)
+            if p.max_prices:
+                self.send(
+                    f"💶 Aktuell: {price_text(s, p)}\n"
+                    "⚠️ Diese Suche nutzt die Preisliste pro Modell (📋 Preisliste). Ein eigener "
+                    "Höchstpreis hat Vorrang: Dann werden auch Modelle gemeldet, die nicht in "
+                    "der Liste stehen. Die Preisliste selbst steht in profiles.toml.\n\n"
+                    "Trotzdem eigenen Höchstpreis setzen? z.B. 160 · 0 = zurück zur Preisliste "
+                    "· /abbrechen"
+                )
+            else:
+                self.send(
+                    f"💶 Aktuell: {price_text(s)}\nNeuer Höchstpreis? z.B. 160\n"
+                    "Oder Mindest- und Höchstpreis: 30-160 · 0 = ohne Grenze"
+                )
         elif action == "f":
             self.awaiting = ("filter", i)
             self.send(

@@ -50,7 +50,6 @@ def build_schema(profile: Profile) -> dict:
         "icloud": {"type": "string", "enum": ["frei", "gesperrt", "unklar", "egal"]},
         "positiv": text_list,
         "offen": text_list,
-        "einschaetzung": {"type": "string"},
     }
     return {
         "type": "object",
@@ -124,7 +123,6 @@ def build_system(profile: Profile) -> str:
         else "- no_go: immer false, no_go_grund: ''.",
         "- positiv: was gut ist (max. 3).",
         "- offen: was unklar ist = Fragen an den Verkäufer (max. 3).",
-        "- einschaetzung: eine kurze Preiseinschätzung.",
     ]
     return "\n".join(parts)
 

@@ -122,7 +122,7 @@ def test_schema_and_prompt(profiles):
 
 
 def test_message_never_exceeds_caption_and_keeps_link(profiles):
-    long = ai_answer(positiv=["x" * 300] * 3, offen=["y" * 300] * 3, einschaetzung="z" * 300)
+    long = ai_answer(positiv=["x" * 300] * 3, offen=["y" * 300] * 3)
     item = make_item(99, "iPhone " * 20)
     text = format_hit(Search(1, "iPhone defekt"), profiles["iphone"], item, long, ["❓ test"])
     assert len(text) <= CAPTION_LIMIT

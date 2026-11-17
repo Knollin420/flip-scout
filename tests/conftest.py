@@ -110,7 +110,6 @@ def ai_answer(**overrides) -> dict:
         "icloud": "unklar",
         "positiv": ["Face ID geht laut Text"],
         "offen": ["Wasserschaden nicht erwähnt"],
-        "einschaetzung": "Fairer Preis",
     }
     return {**base, **overrides}
 

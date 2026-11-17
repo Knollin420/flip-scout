@@ -120,3 +120,31 @@ def test_only_one_instance():
     second = acquire_instance_lock(47999)
     assert second is not None
     second.close()
+
+
+def test_search_view_shows_categories_and_price_list(cfg, store):
+    api = FakeAPI()
+    bot = TelegramBot(cfg, store, api, CHAT)
+    sid = store.add_search("iPhone", "iphone", [""], {"catalog_ids": "3661", "brand_ids": "54661"})
+    bot.handle_update(click(f"s:{sid}"))
+    text = api.last("editMessageText")["text"]
+    assert "Filter: Kategorie: Mobiltelefone · Marke: Apple" in text
+    assert "Preis: laut Preisliste, max. 180 €" in text
+    assert "Suchwörter: keine (nur Kategorie/Filter)" in text
+
+    bot.handle_update(click(f"pl:{sid}"))
+    text = api.last("editMessageText")["text"]
+    assert "• iPhone 13 Pro: 180 €" in text and "• iPhone 12: 90 €" in text
+
+    bot.handle_update(click(f"pr:{sid}"))
+    assert "Preisliste pro Modell" in api.last("sendMessage")["text"]
+    bot.handle_update(msg("0"))  # 0 = keep using the price list
+    assert store.get_search(sid).max_price is None
+
+
+def test_unknown_filter_ids_are_shown_as_numbers():
+    from flip_scout.bot import filter_text
+
+    assert filter_text({"catalog_ids": "9999", "size_ids": "1,2"}) == (
+        "Kategorie: 9999 · Größe: 2 gewählt"
+    )

@@ -111,8 +111,6 @@ def format_hit(
     if ai:
         body += [f"✅ {p}" for p in ai.get("positiv", [])]
         body += [f"❓ {o}" for o in ai.get("offen", [])]
-        if ai.get("einschaetzung"):
-            body.append(f"💡 {ai['einschaetzung']}")
     if item.description_source == "":
         body.append("ℹ️ Beschreibung nicht geladen")
 
