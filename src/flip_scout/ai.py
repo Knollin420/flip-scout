@@ -78,11 +78,10 @@ def build_system(profile: Profile) -> str:
         "",
         f"Was der Käufer sucht: {goal}",
     ]
-    if profile.ok_defects or profile.no_go:
+    if profile.ok_defects:
+        parts += ["", "Diese Defekte sind für den Käufer OKAY:", _bullets(profile.ok_defects)]
+    if profile.no_go:
         parts += [
-            "",
-            "Diese Defekte sind für den Käufer OKAY:",
-            _bullets(profile.ok_defects),
             "",
             "NO-GOS (nur auf true setzen, wenn klar erkennbar, nicht bei bloßem Verdacht):",
             _bullets(profile.no_go),
@@ -120,7 +119,9 @@ def build_system(profile: Profile) -> str:
         "- defekte: erkannte Defekte als Stichworte (leer, wenn keine).",
         "- defekte_ok: true, wenn alle erkannten Defekte zu den OKAY-Defekten passen "
         "(oder keine Defekte).",
-        "- no_go / no_go_grund: siehe NO-GOS ('' wenn keins).",
+        "- no_go / no_go_grund: siehe NO-GOS ('' wenn keins)."
+        if profile.no_go
+        else "- no_go: immer false, no_go_grund: ''.",
         "- positiv: was gut ist (max. 3).",
         "- offen: was unklar ist = Fragen an den Verkäufer (max. 3).",
         "- einschaetzung: eine kurze Preiseinschätzung.",

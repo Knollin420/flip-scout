@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from .ai import AIChecker, AIResponse, AIRetryLater, AIUnavailable
 from .config import Config, Profile
 from .notify import Notifier, format_hit
-from .rules import Decision, decide, find_word, keyword_hit
+from .rules import Decision, decide, find_word, keyword_hit, price_limit
 from .store import Search, Store
 from .vinted import Item, VintedClient, VintedError
 
@@ -121,7 +121,10 @@ class Pipeline:
                 first_request = False
                 try:
                     items = self.vinted.search(
-                        term, search.params, price_from=price_from, price_to=search.max_price
+                        term,
+                        search.params,
+                        price_from=price_from,
+                        price_to=price_limit(profile, search),
                     )
                 except VintedError as exc:
                     result.requests_failed += 1
@@ -195,8 +198,9 @@ class Pipeline:
         min_price = search.min_price if search.min_price is not None else profile.min_price
         if min_price is not None and item.price < min_price:
             return self._skip(search, item, f"unter Mindestpreis {min_price:.0f} €")
-        if search.max_price is not None and item.price > search.max_price:
-            return self._skip(search, item, f"über Höchstpreis {search.max_price:.0f} €")
+        max_price = price_limit(profile, search)
+        if max_price is not None and item.price > max_price:
+            return self._skip(search, item, f"über Höchstpreis {max_price:.0f} €")
         word = find_word(item.title, profile.exclude + profile.exclude_desc)
         if word:
             return self._skip(search, item, f"Ausschlusswort im Titel: {word!r}")
@@ -210,6 +214,8 @@ class Pipeline:
             return self._skip(search, item, f"Ausschlusswort in Beschreibung: {word!r}")
 
         full_text = f"{item.title}\n{item.description}"
+        if profile.require_any and not find_word(full_text, profile.require_any):
+            return self._skip(search, item, "keines der Pflichtwörter in Titel/Beschreibung")
         ai_data: dict | None = None
         warnings: list[str] = []
 

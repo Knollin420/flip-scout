@@ -28,8 +28,13 @@ Code, Commits und README auf Englisch.
   ProtectSystem/ProtectHome). `.env`, `profiles.toml` und `data/` vom PC übernommen,
   `--diagnose` und `--test-notify` grün. Updates als `flipscout`: `sudo -u flipscout git pull`.
 - Windows-PC: Bot beendet und gelöscht.
-- Die 3 Start-Suchen (iPhone defekt, MacBook defekt, Switch OLED) sind in Telegram pausiert.
-  `max_prices` in `profiles.toml` sind noch Beispielwerte.
+- Dienst läuft (enabled) mit 5 aktiven Kategorie-Suchen (seit 17.11.2026), Preise vom
+  Besitzer in `profiles.toml` (nicht im Repo, Sicherung in `data/profiles.toml.bak-*`):
+  iPhone (Handys 3661 + Apple 54661, Preisliste pro Modell, nur iCloud-Sperre schließt aus),
+  MacBook ab 2020 (Laptops 3580 + Apple, < 250 €), Nintendo Switch (Konsolen 3025 +
+  Nintendo 77600; Lite 40, normal 70, OLED 90), Grafikkarten (3602; 1080 Ti 100,
+  3060/3060 Ti 199, funktionsfähig), DDR4-RAM (3603; 8/16/32 GB = 10/30/60 €, Typ notfalls
+  per Foto-Etikett PC4-...).
 - Das Uni-Tool liegt in `/root/tuwel` (vermutlich per Cron). Nicht anfassen.
   Weitere Dienste: apache2, exim4, xinetd (Standard des Hosters), ebenfalls nicht anfassen.
 - Claude Code läuft auf dem Server als root (`claude remote-control` in tmux, Sitzung
@@ -38,14 +43,9 @@ Code, Commits und README auf Englisch.
 
 ## Nächste Schritte
 
-1. Pausieren per Telegram wirkte erst nach Ende eines langen Durchlaufs. Fix: Die Pipeline
-   prüft vor jeder Anzeige, ob die Suche noch aktiv ist.
-2. Pro Anzeige wird nur 1 Foto gefunden (KI sollte bis zu 3 bekommen). JSON-LD/og:image
-   nennen nur das Hauptfoto; alle Fotos stehen in den eingebetteten Next.js-Daten der
-   Anzeigenseite. (`--diagnose` speichert eine Beispielantwort in `data/diagnose-search.json`.)
-3. Mit dem Besitzer: Preistabellen in `profiles.toml`, Suchen einrichten (u. a. Mini-PCs
-   per Vinted-Link), dann Dienst dauerhaft laufen lassen (`systemctl enable --now flip-scout`).
-4. Später: Web-Dashboard (Trefferhistorie, Kosten), das der Besitzer sich gewünscht hat.
+1. Treffer der neuen Suchen mit dem Besitzer auswerten und Profile nachschärfen.
+   Noch offen: Mini-PC-Suche (Wünsche des Besitzers erfragen).
+2. Später: Web-Dashboard (Trefferhistorie, Kosten), das der Besitzer sich gewünscht hat.
 
 ## Vinted-Schnittstelle (Stand September 2026)
 
@@ -59,6 +59,11 @@ Code, Commits und README auf Englisch.
 - Kein Upload-Zeitpunkt mehr. Schutz vor alten Anzeigen: Jeder neue Suchbegriff merkt
   sich beim ersten Lauf den Bestand, und nach einer Pause > 60 min wird neu gemerkt.
   `promoted`-Anzeigen werden übersprungen.
+- Die Textsuche (`search_text`) ist sehr unscharf (bei „macbook“ ≤ 249 € nur 6 von 96
+  Titeln passend). Darum Kategorie (+ Marke) ohne Suchbegriff verwenden. Kategorie- und
+  Marken-IDs stehen in den eingebetteten Daten jeder Anzeigenseite (`catalog_id`, `brand_id`).
+- Fotos: Suche liefert nur das Hauptfoto (signierte `full_size_url`, 1200x1600). Alle Fotos
+  stehen in den eingebetteten Next.js-Daten der Anzeigenseite, aber nur als f800 (600x800).
 - Die Detail-API ist blockiert. Beschreibung und Fotos kommen von der Anzeigenseite
   (JSON-LD / OpenGraph).
 

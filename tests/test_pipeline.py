@@ -246,3 +246,74 @@ def test_pause_during_run_stops_remaining_hits(env, store, cfg):
     assert pipe.run_once().hits == 1  # the other 4 are not sent anymore
     store.update_search(sid, active=True)
     assert pipe.run_once().hits == 0  # and not later either
+
+
+def test_price_table_sets_vinted_price_limit(env, store):
+    pipe, vinted, _, _ = env(FakeAI(ai_answer()))
+    store.add_search("iPhone", "iphone", [""], params={"catalog_ids": "3661"})
+    pipe.run_once()
+    assert vinted.calls[0][3] == 180  # highest price in the table, sent to Vinted
+
+
+def test_model_not_in_table_is_never_reported_without_search_limit(env, store):
+    ai = FakeAI(ai_answer(modell_key="keins", modell="iPhone X"))
+    pipe, vinted, _, notifier = env(ai)
+    store.add_search("iPhone", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [make_item(1, price=50)]
+    assert pipe.run_once().hits == 0 and not notifier.hits
+
+
+def test_require_any_skips_before_ai(env, store, cfg):
+    cfg.profiles["iphone"].require_any = ["switch"]
+    ai = FakeAI(ai_answer())
+    pipe, vinted, _, _ = env(ai)
+    store.add_search("Konsolen", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [make_item(1, title="Nintendo DS"), make_item(2, title="Switch Lite")]
+    pipe.run_once()
+    assert [c[1] for c in ai.calls] == [2, 2]  # only the Switch reaches text + photo check
+
+
+def test_require_any_also_checks_description(env, store, cfg):
+    cfg.profiles["iphone"].require_any = ["3060"]
+    ai = FakeAI(ai_answer())
+    pipe, vinted, _, _ = env(ai)
+    store.add_search("GPU", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [make_item(1, title="Grafikkarte Nvidia")]
+    vinted.descriptions[1] = "Gigabyte RTX 3060 12 GB, läuft einwandfrei"
+    pipe.run_once()
+    assert ai.calls  # found in the description
+
+
+def test_no_go_ignored_when_profile_has_none(env, store, cfg):
+    cfg.profiles["iphone"].no_go = []
+    ai = FakeAI(ai_answer(no_go=True, no_go_grund="Wasserschaden"))
+    pipe, vinted, _, notifier = env(ai)
+    store.add_search("iPhone", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [make_item(1, price=150)]
+    assert pipe.run_once().hits == 1
+
+
+def test_unclear_model_in_text_goes_to_photo_check(env, store):
+    ai = FakeAI(
+        ai_answer(passt="unklar", modell_key="keins"),  # text: type not mentioned
+        ai_answer(passt="ja", modell_key="iPhone 12"),  # photos: label shows it
+    )
+    pipe, vinted, _, notifier = env(ai)
+    store.add_search("S", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [make_item(1, price=80)]
+    assert pipe.run_once().hits == 1
+    assert [c[2] for c in ai.calls] == [0, 3]  # text check, then photo check with 3 photos
+
+
+def test_unclear_model_after_photos_is_not_reported(env, store):
+    ai = FakeAI(ai_answer(passt="unklar", modell_key="keins"))
+    pipe, vinted, _, notifier = env(ai)
+    store.add_search("S", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [make_item(1, price=80)]
+    assert pipe.run_once().hits == 0 and len(ai.calls) == 2

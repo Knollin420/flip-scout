@@ -27,6 +27,14 @@ def find_word(text: str, words: list[str]) -> str | None:
     return None
 
 
+def price_limit(profile: Profile, search: Search) -> float | None:
+    """Highest price worth looking at: the search's own limit, else the highest
+    price in the profile's table (models not in the table are never reported)."""
+    if search.max_price is not None:
+        return search.max_price
+    return max(profile.max_prices.values()) if profile.max_prices else None
+
+
 def keyword_hit(profile: Profile, text: str) -> bool:
     hay = _norm(text)
     if profile.must_include and all(_norm(w) in hay for w in profile.must_include):
@@ -47,7 +55,7 @@ def decide(profile: Profile, search: Search, price: float, ai: dict, final: bool
     passt = ai.get("passt", "unklar")
     if passt == "nein":
         return Decision(False, "KI: passt nicht")
-    if ai.get("no_go"):
+    if profile.no_go and ai.get("no_go"):
         return Decision(False, f"No-Go: {ai.get('no_go_grund') or 'ja'}")
     if profile.ok_defects and ai.get("defekte") and ai.get("defekte_ok") is False:
         return Decision(False, f"Defekte nicht okay: {', '.join(ai['defekte'])}")
@@ -66,6 +74,8 @@ def decide(profile: Profile, search: Search, price: float, ai: dict, final: bool
             limit = profile.max_prices[key]
             if price > limit:
                 return Decision(False, f"{key}: {price:.0f} € > {limit:.0f} €")
+        elif passt == "unklar" and not final:
+            pass  # model not recognisable from the text alone: the photo check decides
         elif search.max_price is None:
             return Decision(False, f"Modell nicht in Preistabelle ({ai.get('modell') or '?'})")
         else:

@@ -54,6 +54,7 @@ class Profile:
     exclude_desc: list[str] = field(default_factory=list)
     must_include: list[str] = field(default_factory=list)
     any_include: list[str] = field(default_factory=list)
+    require_any: list[str] = field(default_factory=list)
     min_price: float | None = None
     ai_check: str = ""
     briefing: bool = True
