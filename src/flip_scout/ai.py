@@ -88,11 +88,15 @@ def build_system(profile: Profile) -> str:
     if profile.max_prices:
         parts += [
             "",
-            "modell_key: Ordne das Gerät EXAKT einem dieser Schlüssel zu, sonst "
-            f"'{NO_MODEL}'. Varianten sind verschiedene Modelle (z.B. 'iPhone 13 Pro' ist "
-            "nicht 'iPhone 13'). Bei Unsicherheit über das genaue Modell: "
-            f"'{NO_MODEL}'.",
-            ", ".join(profile.max_prices),
+            "modell_key: Ein Schlüssel steht für eine Gruppe. Wähle ihn, sobald das Gerät "
+            "eindeutig in diese Gruppe fällt. Details, die die Schlüssel nicht unterscheiden "
+            "(z.B. Speicher, Farbe, Revision, Einzelstück oder Set), sind dafür egal. "
+            "Unterscheiden zwei Schlüssel eine Variante, zählt sie (z.B. 'iPhone 13 Pro' "
+            "ist nicht 'iPhone 13').",
+            f"- '{NO_MODEL}', wenn es klar ein Modell ist, für das es keinen Schlüssel gibt.",
+            "- Ist die Gruppe aus den vorhandenen Angaben nicht bestimmbar: "
+            f"'{NO_MODEL}' UND passt = 'unklar' (dann werden die Fotos geprüft).",
+            "Schlüssel: " + ", ".join(profile.max_prices),
         ]
     else:
         parts += ["", f"modell_key: immer '{NO_MODEL}'."]
@@ -112,7 +116,8 @@ def build_system(profile: Profile) -> str:
         "",
         "Felder:",
         "- passt: 'ja' = entspricht dem Gesuchten; 'nein' = klar nicht (Zubehör, Suchanzeige, "
-        "anderes Produkt, Einzelteil); 'unklar' = nicht sicher.",
+        "anderes Produkt, Einzelteil); 'unklar' = nicht sicher. Fehlende Angaben wie "
+        "Baujahr oder genaues Modell sind kein Grund für 'nein', sondern für 'unklar'.",
         "- modell: Modell mit Details aus der Anzeige (z.B. Speicher, Farbe).",
         "- zustand: ein kurzer Satz.",
         "- defekte: erkannte Defekte als Stichworte (leer, wenn keine).",
