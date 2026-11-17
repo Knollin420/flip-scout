@@ -28,13 +28,14 @@ Code, Commits und README auf Englisch.
   ProtectSystem/ProtectHome). `.env`, `profiles.toml` und `data/` vom PC übernommen,
   `--diagnose` und `--test-notify` grün. Updates als `flipscout`: `sudo -u flipscout git pull`.
 - Windows-PC: Bot beendet und gelöscht.
-- Dienst läuft (enabled) mit 5 aktiven Kategorie-Suchen (seit 17.11.2026), Preise vom
+- Dienst läuft (enabled) mit 6 aktiven Kategorie-Suchen (seit 17.11.2026), Preise vom
   Besitzer in `profiles.toml` (nicht im Repo, Sicherung in `data/profiles.toml.bak-*`):
   iPhone (Handys 3661 + Apple 54661, Preisliste pro Modell, nur iCloud-Sperre schließt aus),
   MacBook ab 2020 (Laptops 3580 + Apple, < 250 €), Nintendo Switch (Konsolen 3025 +
   Nintendo 77600; Lite 40, normal 70, OLED 90), Grafikkarten (3602; 1080 Ti 100,
   3060/3060 Ti 199, funktionsfähig), DDR4-RAM (3603; 8/16/32 GB = 10/30/60 €, Typ notfalls
-  per Foto-Etikett PC4-...).
+  per Foto-Etikett PC4-...), Mini-PC (Desktop-Computer 3581; ≤ 100 €, nur Mobil-CPU
+  ab N100-Niveau wegen < 20 W im Leerlauf, H-CPUs erlaubt, RAM/SSD dürfen fehlen, funktionsfähig).
 - Das Uni-Tool liegt in `/root/tuwel` (vermutlich per Cron). Nicht anfassen.
   Weitere Dienste: apache2, exim4, xinetd (Standard des Hosters), ebenfalls nicht anfassen.
 - Claude Code läuft auf dem Server als root (`claude remote-control` in tmux, Sitzung
@@ -44,7 +45,6 @@ Code, Commits und README auf Englisch.
 ## Nächste Schritte
 
 1. Treffer der neuen Suchen mit dem Besitzer auswerten und Profile nachschärfen.
-   Noch offen: Mini-PC-Suche (Wünsche des Besitzers erfragen).
 2. Später: Web-Dashboard (Trefferhistorie, Kosten), das der Besitzer sich gewünscht hat.
 
 ## Vinted-Schnittstelle (Stand September 2026)
