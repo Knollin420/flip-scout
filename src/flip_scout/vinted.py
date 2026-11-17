@@ -44,6 +44,9 @@ class Item:
     promoted: bool = False  # paid "bump" – usually an old listing pushed to the top
     description: str = ""
     description_source: str = ""  # "api", "page" or "" (not available)
+    seller_login: str = ""
+    seller_feedback: int | None = None  # number of ratings, None = unknown
+    seller_rating: float | None = None  # 0..1 (Vinted's feedback_reputation)
     photo_cache: dict = field(default_factory=dict, repr=False)  # url -> (bytes, type) | None
 
     def age_minutes(self, now: float | None = None) -> float | None:
@@ -122,6 +125,7 @@ def parse_catalog_item(raw: dict, base_url: str) -> Item:
         reserved=bool(raw.get("is_reserved")),
         closed=bool(raw.get("is_closed") or raw.get("is_hidden")),
         promoted=bool(raw.get("promoted")),
+        seller_login=str((raw.get("user") or {}).get("login") or ""),
     )
 
 
@@ -221,6 +225,28 @@ def merge_photos(known: list[str], page: list[str]) -> list[str]:
         return known
     by_id = {image_id: url for url in known if (image_id := _image_id(url))}
     return [by_id.get(_image_id(url), url) if _image_id(url) else url for url in page]
+
+
+_FEEDBACK_COUNT = re.compile(r'"feedback_count"\s*:\s*(\d+)')
+_FEEDBACK_REPUTATION = re.compile(r'"feedback_reputation"\s*:\s*([\d.]+)')
+
+
+def seller_from_page(page: str, login: str) -> tuple[int, float | None] | None:
+    """Number of ratings and reputation (0..1) of the seller, from the embedded page data.
+
+    Only accepted if the seller's login stands in the same part of the page, so the
+    ratings of another user can never be taken by mistake."""
+    if not login:
+        return None
+    data = page.replace('\\"', '"')
+    own_login = re.compile(r'"(?:login|username|name)"\s*:\s*"' + re.escape(login) + '"')
+    for match in _FEEDBACK_COUNT.finditer(data):
+        window = data[max(0, match.start() - 3000) : match.end() + 300]
+        if not own_login.search(window):
+            continue
+        reputation = _FEEDBACK_REPUTATION.search(window)
+        return int(match.group(1)), float(reputation.group(1)) if reputation else None
+    return None
 
 
 def sniff_media_type(data: bytes) -> str | None:
@@ -359,6 +385,9 @@ class VintedClient:
             return
         page = resp.text
         item.photo_urls = merge_photos(item.photo_urls, photos_from_page(page))
+        seller = seller_from_page(page, item.seller_login)
+        if seller:
+            item.seller_feedback, item.seller_rating = seller
         desc = description_from_page(page)
         if desc:
             item.description, item.description_source = desc, "page"

@@ -22,6 +22,8 @@ class Settings:
     alarm_after_failed_runs: int = 3
     timezone: str = "Europe/Vienna"
     seen_retention_days: int = 30
+    # Sellers without any rating: only listings up to this price (None = no limit)
+    no_feedback_max_price: float | None = None
 
     @property
     def base_url(self) -> str:

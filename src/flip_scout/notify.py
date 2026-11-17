@@ -83,6 +83,16 @@ def _cut(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+def seller_text(item: Item) -> str:
+    if item.seller_feedback is None:
+        return "👤 Verkäufer: Bewertungen unbekannt"
+    if item.seller_feedback == 0:
+        return "👤 Verkäufer: noch keine Bewertungen"
+    stars = f" · ★ {item.seller_rating * 5:.1f}" if item.seller_rating is not None else ""
+    word = "Bewertung" if item.seller_feedback == 1 else "Bewertungen"
+    return f"👤 Verkäufer: {item.seller_feedback} {word}{stars}"
+
+
 def format_hit(
     search: Search,
     profile: Profile,
@@ -96,6 +106,7 @@ def format_hit(
         f"{profile.emoji} {search.name}",
         item.title,
         f"💶 {item.price:.2f} € · {item.brand or '-'} · {item.size or '-'}",
+        seller_text(item),
     ]
     body: list[str] = []
     if ai:

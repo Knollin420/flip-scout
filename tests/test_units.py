@@ -323,3 +323,27 @@ def test_search_full_size_photo_is_kept_with_page_photos():
     item.photo_urls = [main_full]
     client.load_details(item)
     assert item.photo_urls == [main_full, *page_photos[1:]]
+
+
+def test_seller_ratings_from_page_need_matching_login():
+    from flip_scout.vinted import seller_from_page
+
+    user = {"id": 5, "login": "anna", "feedback_count": 43, "feedback_reputation": 0.98}
+    other = {"id": 6, "login": "bob", "feedback_count": 7, "feedback_reputation": 1}
+    page = (
+        "<script>self.__next_f.push([1," + json.dumps(json.dumps({"seller": user})) + "])</script>"
+    )
+    assert seller_from_page(page, "anna") == (43, 0.98)
+    assert seller_from_page(page, "bob") is None
+    page2 = "<script>" + json.dumps({"x": other}) + "</script>"
+    assert seller_from_page(page2, "bob") == (7, 1.0)
+    assert seller_from_page(page2, "") is None
+    # vinted.at today: sidebar block with "name" instead of "login"
+    sidebar = {"data": {"feedback_count": 0, "feedback_reputation": 0, "name": "teolo81"}}
+    page3 = "<script>self.__next_f.push([1," + json.dumps(json.dumps(sidebar)) + "])</script>"
+    assert seller_from_page(page3, "teolo81") == (0, 0.0)
+
+
+def test_seller_login_from_search():
+    raw = {"id": 1, "title": "x", "price": {"amount": "5"}, "user": {"id": 9, "login": "anna"}}
+    assert parse_catalog_item(raw, "https://www.vinted.at").seller_login == "anna"

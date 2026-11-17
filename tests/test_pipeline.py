@@ -317,3 +317,27 @@ def test_unclear_model_after_photos_is_not_reported(env, store):
     pipe.run_once()
     vinted.results[""] = [make_item(1, price=80)]
     assert pipe.run_once().hits == 0 and len(ai.calls) == 2
+
+
+def test_seller_without_ratings_only_up_to_limit(env, store, cfg):
+    cfg.settings.no_feedback_max_price = 50
+    ai = FakeAI(ai_answer(modell_key="iPhone 13 Pro"))
+    pipe, vinted, _, notifier = env(ai)
+    store.add_search("S", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [make_item(1, price=120), make_item(2, price=50), make_item(3, price=120)]
+    vinted.sellers = {1: (0, 0.0), 2: (0, 0.0), 3: (1, 1.0)}
+    assert pipe.run_once().hits == 2  # item 1 skipped: 0 ratings and over 50 €
+    assert {c[1] for c in ai.calls} == {2, 3}  # skipped before any AI call
+    assert "👤 Verkäufer: noch keine Bewertungen" in notifier.hits[0]
+    assert "👤 Verkäufer: 1 Bewertung · ★ 5.0" in notifier.hits[1]
+
+
+def test_unknown_seller_ratings_never_block(env, store, cfg):
+    cfg.settings.no_feedback_max_price = 50
+    pipe, vinted, _, notifier = env(FakeAI(ai_answer()))
+    store.add_search("S", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [make_item(1, price=120)]
+    assert pipe.run_once().hits == 1
+    assert "Bewertungen unbekannt" in notifier.hits[0]

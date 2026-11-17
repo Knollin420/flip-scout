@@ -42,6 +42,7 @@ class FakeVinted:
     def __init__(self):
         self.results: dict[str, list[Item]] = {}
         self.descriptions: dict[int, str] = {}
+        self.sellers: dict[int, tuple[int, float]] = {}
         self.fail = False
         self.calls: list[tuple] = []
         self.downloads: list[str] = []
@@ -56,6 +57,8 @@ class FakeVinted:
         return [Item(**{**i.__dict__, "photo_cache": {}}) for i in self.results.get(term, [])]
 
     def load_details(self, item):
+        if item.id in self.sellers:
+            item.seller_feedback, item.seller_rating = self.sellers[item.id]
         if item.id in self.descriptions:
             item.description = self.descriptions[item.id]
             item.description_source = "api"

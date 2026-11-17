@@ -35,6 +35,15 @@ def price_limit(profile: Profile, search: Search) -> float | None:
     return max(profile.max_prices.values()) if profile.max_prices else None
 
 
+def seller_problem(item, no_feedback_max_price: float | None) -> str | None:
+    """Reason to skip because of the seller, or None. Unknown ratings never block."""
+    if no_feedback_max_price is None or item.seller_feedback is None:
+        return None
+    if item.seller_feedback == 0 and item.price > no_feedback_max_price:
+        return f"Verkäufer ohne Bewertungen, Preis über {no_feedback_max_price:g} €"
+    return None
+
+
 def keyword_hit(profile: Profile, text: str) -> bool:
     hay = _norm(text)
     if profile.must_include and all(_norm(w) in hay for w in profile.must_include):
