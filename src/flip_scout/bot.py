@@ -43,11 +43,12 @@ CATALOG_NAMES = {
     "3025": "Spielkonsolen",
     "3580": "Laptops",
     "3581": "Desktop-PCs",
+    "3599": "Prozessoren",
     "3602": "Grafikkarten",
     "3603": "Arbeitsspeicher (RAM)",
     "3661": "Mobiltelefone",
 }
-BRAND_NAMES = {"54661": "Apple", "77600": "Nintendo"}
+BRAND_NAMES = {"54661": "Apple", "77600": "Nintendo", "536855": "AMD"}
 ID_NAMES = {"catalog_ids": CATALOG_NAMES, "brand_ids": BRAND_NAMES}
 
 
