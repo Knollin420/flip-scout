@@ -199,6 +199,25 @@ check_icloud = false
 "RTX 3060" = 199
 "RTX 3060 Ti" = 199
 
+[profile.gpu_amd]
+label = "AMD-Grafikkarte"
+emoji = "🟥"
+require_any = ["6800"]        # zweite Sicherung; die Suche nutzt schon das Suchwort "6800"
+exclude = ["defekt", "kaputt", "bastler", "für teile", "laptop", "notebook", "6800m", "6800 m"]
+exclude_desc = ["ich suche", "nur tausch"]
+ai_check = """Eine einzelne, funktionsfähige Desktop-Grafikkarte: genau AMD Radeon RX 6800 oder RX 6800 XT
+(Hersteller egal: Sapphire, PowerColor, XFX, ASUS, Gigabyte, MSI, AMD-Referenz). Andere Modelle
+(z.B. RX 6700 XT, RX 6900 XT, RX 6950 XT, RX 7800 XT, Laptop-Chip RX 6800M) haben modell_key 'keins'.
+Kein kompletter PC oder Laptop, keine Suchanzeige, nicht nur Kühler oder Karton."""
+ok_defects = []
+no_go = ["defekt oder nur teilweise funktionsfähig", "Bildfehler/Artefakte", "ungetestet oder als Bastlerware verkauft"]
+check_icloud = false
+title_models = true
+
+[profile.gpu_amd.max_prices]
+"RX 6800" = 200
+"RX 6800 XT" = 330
+
 [profile.ram_ddr4]
 label = "DDR4-RAM"
 emoji = "🧠"
