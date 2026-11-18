@@ -157,7 +157,8 @@ def test_fixed_rhythm_between_runs():
     s = Settings(interval_minutes=3, jitter_seconds=20)
     no_jitter = lambda a, b: 0  # noqa: E731
     assert seconds_until_next_run(s, 40, no_jitter) == 140  # 180 s rhythm minus 40 s run
-    assert seconds_until_next_run(s, 170, no_jitter) == 60  # always at least 60 s pause
+    assert seconds_until_next_run(s, 170, no_jitter) == 30  # always at least 30 s pause
+    assert seconds_until_next_run(s, 10, no_jitter, tick_minutes=1) == 50  # 1-minute tick
 
 
 def test_interval_below_three_minutes_is_refused(tmp_path):
@@ -171,3 +172,18 @@ def test_interval_below_three_minutes_is_refused(tmp_path):
         load_config(f)
     f.write_text("[settings]\ninterval_minutes = 3\n", encoding="utf-8")
     assert load_config(f).settings.interval_minutes == 3
+
+
+def test_profile_interval_minimum_is_one_minute(tmp_path):
+    import pytest
+
+    from flip_scout.config import load_config
+
+    f = tmp_path / "p.toml"
+    f.write_text("[profile.x]\ninterval_minutes = 0.5\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="mindestens 1"):
+        load_config(f)
+    f.write_text(
+        "[settings]\ninterval_minutes = 3\n[profile.x]\ninterval_minutes = 1\n", encoding="utf-8"
+    )
+    assert load_config(f).tick_minutes() == 1

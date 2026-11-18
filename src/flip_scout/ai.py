@@ -51,6 +51,9 @@ def build_schema(profile: Profile) -> dict:
         "positiv": text_list,
         "offen": text_list,
     }
+    if profile.cpu_check:
+        props["cpu"] = {"type": "string"}
+        props["cpu_kerne"] = {"type": "integer"}
     return {
         "type": "object",
         "properties": props,
@@ -112,6 +115,21 @@ def build_system(profile: Profile) -> str:
         ]
     else:
         parts += ["", "icloud: immer 'egal'."]
+    if profile.cpu_check:
+        parts += [
+            "",
+            "cpu: die genaue Prozessor-Bezeichnung mit Modellnummer, z.B. 'Intel Core i5-8250U', "
+            "'AMD Ryzen 5 3500U', 'Intel N100', 'Apple M1', 'MediaTek Kompanio 520'. Quellen: "
+            "Text; Aufkleber neben dem Touchpad oder am Gerät, Typenschild, Systeminfo-/BIOS-"
+            "Screenshot auf den Fotos; die genaue Modellbezeichnung des Geräts NUR, wenn es "
+            "diese ausschließlich mit genau einem Prozessor gab. Ist nur die Familie bekannt "
+            "(z.B. 'Intel Core i5' ohne Nummer), schreibe genau das, mit Generation falls "
+            "bekannt ('Intel Core i5 8th Gen'). Nichts erfinden: '' wenn unbekannt.",
+            "cpu_kerne: Anzahl der physischen Kerne dieses Prozessors (dein Wissen über das "
+            "Modell), 0 wenn unbekannt.",
+            "Ob der Prozessor reicht, entscheidest NICHT du: Setze passt nicht wegen der CPU auf "
+            "'nein'. Ist die CPU aus dem Text nicht bestimmbar, setze passt = 'unklar'.",
+        ]
     parts += [
         "",
         "Felder:",

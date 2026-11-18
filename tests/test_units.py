@@ -393,3 +393,40 @@ def test_min_seller_feedback_regardless_of_price():
     assert seller_problem(item, 50, 1) is None
     item.seller_feedback = None
     assert seller_problem(item, 50, 1) is None  # unknown never blocks
+
+
+@pytest.mark.parametrize(
+    "cpu,cores,mobile,ok",
+    [
+        ("Intel Core i5-8250U", 4, False, True),
+        ("Intel Core i7-1165G7", 4, False, True),
+        ("Intel Core i3-1125G4", 4, False, True),
+        ("Intel Core i3-1115G4", 2, False, False),
+        ("Intel Core i3-10110U", 0, False, False),  # i3 before 11th gen, even without cores
+        ("Intel Core i5-7200U", 0, False, False),
+        ("Intel Core m3-8100Y", 2, False, False),
+        ("Intel Pentium Gold 4425Y", 2, False, False),
+        ("Intel N4020", 0, False, False),
+        ("MediaTek Kompanio 520", 8, False, False),
+        ("Intel N100", 4, True, True),
+        ("Intel Core i3-N305", 8, True, True),
+        ("AMD Ryzen 5 3500U", 4, False, True),
+        ("AMD Ryzen 3 3200U", 0, False, False),
+        ("AMD Ryzen 5 5600G", 6, True, False),
+        ("Intel Core i5-8500T", 6, True, False),  # desktop CPU in a mini PC
+        ("Apple M1", 8, False, True),
+        ("Intel Core i5 8th Gen", 0, False, True),
+    ],
+)
+def test_cpu_rules(cpu, cores, mobile, ok):
+    from flip_scout.cpu import cpu_problem
+
+    assert (cpu_problem(cpu, cores, mobile) is None) == ok
+
+
+def test_cpu_unknown():
+    from flip_scout.cpu import UNKNOWN, cpu_problem
+
+    assert cpu_problem("", 0) == UNKNOWN
+    assert cpu_problem("Intel Core i5", 0) == UNKNOWN
+    assert cpu_problem("Intel Core i5 8th Gen", 0, mobile_suffix_required=True) == UNKNOWN

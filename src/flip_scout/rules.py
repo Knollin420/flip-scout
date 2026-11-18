@@ -9,6 +9,8 @@ import re
 from dataclasses import dataclass, field
 
 from .config import Profile
+from .cpu import UNKNOWN as CPU_UNKNOWN
+from .cpu import cpu_problem
 from .store import Search
 
 NO_MODEL = "keins"
@@ -125,7 +127,20 @@ def decide(profile: Profile, search: Search, price: float, ai: dict, final: bool
         if icloud == "unklar":
             warnings.append("❓ iCloud: unklar – Verkäufer fragen!")
 
-    if profile.max_prices:
+    if profile.cpu_check:
+        # The AI only reads the CPU; whether it is good enough is decided by fixed rules.
+        problem = cpu_problem(
+            ai.get("cpu", ""), ai.get("cpu_kerne") or None, profile.cpu_check == "minipc"
+        )
+        if problem == CPU_UNKNOWN:
+            if final:
+                return Decision(False, f"{CPU_UNKNOWN} ({ai.get('cpu') or '?'})")
+        elif problem:
+            return Decision(False, problem)
+        limit = max(profile.max_prices.values()) if profile.max_prices else None
+        if limit is not None and price > limit:
+            return Decision(False, f"{price:.0f} € > {limit:.0f} €")
+    elif profile.max_prices:
         key = ai.get("modell_key") or NO_MODEL
         if key in profile.max_prices:
             limit = profile.max_prices[key]

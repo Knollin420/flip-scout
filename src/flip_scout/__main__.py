@@ -25,14 +25,17 @@ from .urlimport import parse_vinted_url
 log = logging.getLogger("flip_scout")
 
 
-MIN_GAP_SECONDS = 60.0
+MIN_GAP_SECONDS = 30.0
 
 
-def seconds_until_next_run(settings, elapsed: float, rand=random.uniform) -> float:
-    """Fixed rhythm: a run starts every interval (plus jitter), no matter how long the
+def seconds_until_next_run(
+    settings, elapsed: float, rand=random.uniform, tick_minutes: float | None = None
+) -> float:
+    """Fixed rhythm: a run starts every tick (plus jitter), no matter how long the
     previous run took. At least MIN_GAP_SECONDS pause after a very long run."""
-    cycle = settings.interval_minutes * 60 + rand(-settings.jitter_seconds, settings.jitter_seconds)
-    return max(MIN_GAP_SECONDS, cycle - elapsed)
+    tick = 60 * (tick_minutes or settings.interval_minutes)
+    jitter = min(settings.jitter_seconds, 0.15 * tick)
+    return max(MIN_GAP_SECONDS, tick + rand(-jitter, jitter) - elapsed)
 
 
 def import_seed_searches(cfg: Config, store: Store) -> None:
@@ -177,19 +180,25 @@ def main(argv: list[str] | None = None) -> int:
 
     monitor.started()
     pruned_day = ""
-    log.info("flip-scout läuft – Intervall %.0f min", cfg.settings.interval_minutes)
+    fast = {p.label: p.interval_minutes for p in cfg.profiles.values() if p.interval_minutes}
+    log.info(
+        "flip-scout läuft – Intervall %g min%s",
+        cfg.settings.interval_minutes,
+        "".join(f", {label}: {m:g} min" for label, m in fast.items()),
+    )
     while not stop.is_set():
         started = time.monotonic()
         try:
-            result = pipeline.run_once()
-            log.info(
-                "Durchlauf: %d neue Anzeigen, %d Treffer (%d/%d Anfragen ok)",
-                result.new_items,
-                result.hits,
-                result.requests_ok,
-                result.requests_ok + result.requests_failed,
-            )
-            monitor.after_run(result)
+            result = pipeline.run_once(only_due=True)
+            if result.requests_ok + result.requests_failed:  # no search due -> nothing to log
+                log.info(
+                    "Durchlauf: %d neue Anzeigen, %d Treffer (%d/%d Anfragen ok)",
+                    result.new_items,
+                    result.hits,
+                    result.requests_ok,
+                    result.requests_ok + result.requests_failed,
+                )
+                monitor.after_run(result)
             monitor.maybe_heartbeat()
             today = cfg.settings.day(time.time())
             if today != pruned_day:
@@ -197,7 +206,8 @@ def main(argv: list[str] | None = None) -> int:
                 pruned_day = today
         except Exception:
             log.exception("Unerwarteter Fehler im Durchlauf")
-        stop.wait(seconds_until_next_run(cfg.settings, time.monotonic() - started))
+        elapsed = time.monotonic() - started
+        stop.wait(seconds_until_next_run(cfg.settings, elapsed, tick_minutes=cfg.tick_minutes()))
     log.info("flip-scout beendet")
     return 0
 

@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 
 # Lower limit for the search interval (Vinted bot protection). 3 minutes since 2026-11-18.
 MIN_INTERVAL_MINUTES = 3.0
+# Single searches (profile.interval_minutes) may run more often, but never below this.
+MIN_PROFILE_INTERVAL_MINUTES = 1.0
 
 
 @dataclass
@@ -73,6 +75,10 @@ class Profile:
     title_skip_models: list[str] = field(default_factory=list)
     # Minimum number of seller ratings, regardless of price (unknown ratings never block)
     min_seller_feedback: int = 0
+    # CPU check by fixed rules (cpu.py): "laptop" or "minipc" (mobile suffix required); "" = off
+    cpu_check: str = ""
+    # Own search interval for searches with this profile (None = settings.interval_minutes)
+    interval_minutes: float | None = None
 
     def __post_init__(self) -> None:
         if not self.label:
@@ -95,6 +101,11 @@ class Config:
     seed_searches: list[dict] = field(default_factory=list)
     secrets: Secrets = field(default_factory=Secrets)
     data_dir: Path = Path("data")
+
+    def tick_minutes(self) -> float:
+        """How often the main loop looks for searches that are due."""
+        own = [p.interval_minutes for p in self.profiles.values() if p.interval_minutes]
+        return min([self.settings.interval_minutes, *own])
 
     def profile(self, key: str) -> Profile:
         return self.profiles.get(key) or self.profiles["standard"]
@@ -148,6 +159,12 @@ def load_config(
         praw = dict(praw)
         praw["max_prices"] = {str(k): float(v) for k, v in praw.get("max_prices", {}).items()}
         profiles[key] = _pick(Profile, praw, key=key)
+    for p in profiles.values():
+        if p.interval_minutes is not None and p.interval_minutes < MIN_PROFILE_INTERVAL_MINUTES:
+            raise ValueError(
+                f"Profil {p.key!r}: interval_minutes muss mindestens "
+                f"{MIN_PROFILE_INTERVAL_MINUTES:g} sein (Bot-Schutz von Vinted)."
+            )
     profiles.setdefault("standard", Profile(key="standard", label="Normal"))
 
     seeds = list(raw.get("search", []))

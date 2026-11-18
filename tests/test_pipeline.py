@@ -1,6 +1,6 @@
 from flip_scout.ai import AIRetryLater, AIUnavailable
 
-from .conftest import FakeAI, ai_answer, make_item
+from .conftest import NOW, FakeAI, ai_answer, make_item
 
 
 def seed_and_add(store, vinted, pipe, search_id, term, item):
@@ -364,3 +364,38 @@ def test_title_check_skips_before_page_load_and_ai(env, store, cfg):
     checked_by_ai = {c[1] for c in ai.calls}
     assert checked_by_ai == {1, 4}
     assert ("page", 2) not in vinted.calls and ("page", 3) not in vinted.calls
+
+
+def test_searches_run_on_their_own_interval(env, store, cfg):
+    cfg.settings.interval_minutes = 3
+    cfg.profiles["iphone"].interval_minutes = 1
+    pipe, vinted, _, _ = env(FakeAI(ai_answer()))
+    clock = [NOW]
+    pipe.now = lambda: clock[0]
+    store.add_search("iPhone", "iphone", ["iphone"])
+    store.add_search("Switch", "standard", ["switch"])
+    searched = []
+    for minute in range(7):
+        clock[0] = NOW + minute * 60
+        vinted.calls.clear()
+        pipe.run_once(only_due=True)
+        searched.append(sorted(c[0] for c in vinted.calls))
+    assert [("switch" in s) for s in searched] == [True, False, False, True, False, False, True]
+    assert all("iphone" in s for s in searched)  # iPhone every minute
+
+
+def test_cpu_check_decided_by_rules_not_ai(store):
+    from flip_scout.config import Profile
+    from flip_scout.rules import decide
+    from flip_scout.store import Search
+
+    p = Profile(key="laptop", cpu_check="laptop", max_prices={"Laptop": 100})
+    s = Search(1, "Laptop")
+    ok = ai_answer(modell_key="Laptop", cpu="Intel Core i5-8250U", cpu_kerne=4)
+    assert decide(p, s, 90, ok, final=True).notify
+    assert not decide(p, s, 120, ok, final=True).notify  # over 100 €
+    weak = ai_answer(modell_key="Laptop", cpu="MediaTek MT8183", cpu_kerne=8)
+    assert "zu schwach" in decide(p, s, 50, weak, final=True).reason
+    unknown = ai_answer(passt="unklar", modell_key="keins", cpu="", cpu_kerne=0)
+    assert decide(p, s, 50, unknown, final=False).notify  # text: unclear -> photo check
+    assert not decide(p, s, 50, unknown, final=True).notify  # still unknown after photos

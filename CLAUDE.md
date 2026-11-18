@@ -19,7 +19,9 @@ Code, Commits und README auf Englisch.
 - Der Bot darf mit demselben Telegram-Token **nur an einer Stelle** laufen. Wenn er auf dem
   Server läuft, muss er auf dem Windows-PC des Besitzers gestoppt sein.
 - Vinted-Intervall nie unter 3 Minuten (Besitzer hat am 18.11.2026 von 5 auf 3 gesenkt;
-  bei Block-Warnungen zurück auf 5). Nicht mehr Suchbegriffe als nötig.
+  bei Block-Warnungen zurück auf 5). Einzelne Profile dürfen per `interval_minutes` öfter
+  suchen, nie unter 1 Minute (iPhone: 1 Minute, Besitzer-Entscheidung 18.11.2026).
+  Nicht mehr Suchbegriffe als nötig.
 
 ## Stand (November 2026)
 

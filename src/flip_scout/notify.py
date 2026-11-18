@@ -114,6 +114,9 @@ def format_hit(
         zustand = ai.get("zustand") or ""
         if model or zustand:
             body.append("🔎 " + " – ".join(x for x in (model, zustand) if x))
+        if ai.get("cpu"):
+            cores = f" ({ai['cpu_kerne']} Kerne)" if ai.get("cpu_kerne") else ""
+            body.append(f"🧩 CPU: {ai['cpu']}{cores}")
         if ai.get("defekte"):
             body.append("⚠️ Defekt: " + ", ".join(ai["defekte"]))
         if profile.check_icloud and ai.get("icloud") == "frei":

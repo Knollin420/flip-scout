@@ -69,6 +69,7 @@ class Pipeline:
         self.sleep = sleep
         self.now = now
         self.rand = rand
+        self.last_searched: dict[int, float] = {}  # search id -> time of last search
 
     # --- helpers ----------------------------------------------------------
 
@@ -113,12 +114,28 @@ class Pipeline:
         log.info("Pause von %.0f min – merke mir zuerst nur den aktuellen Stand", pause / 60)
         return True
 
-    def run_once(self) -> RunResult:
+    def search_interval(self, profile: Profile) -> float:
+        """Seconds between two runs of a search with this profile."""
+        return 60 * (profile.interval_minutes or self.cfg.settings.interval_minutes)
+
+    def is_due(self, search: Search, profile: Profile) -> bool:
+        last = self.last_searched.get(search.id)
+        if last is None:
+            return True
+        half_tick = 30 * self.cfg.tick_minutes()  # tolerate the loop's own jitter
+        return self.now() - last >= self.search_interval(profile) - half_tick
+
+    def run_once(self, only_due: bool = False) -> RunResult:
+        """One pass over the active searches. only_due=True skips searches whose own
+        interval has not passed yet (used by the main loop)."""
         result = RunResult()
         self.reseed_after_pause()
         first_request = True
         for search in self.store.list_searches(active_only=True):
             profile = self.cfg.profile(search.profile)
+            if only_due and not self.is_due(search, profile):
+                continue
+            self.last_searched[search.id] = self.now()
             price_from = search.min_price if search.min_price is not None else profile.min_price
             candidates: list[Item] = []
             for term in search.terms:
