@@ -32,7 +32,7 @@ Code, Commits und README auf Englisch.
   `--diagnose` und `--test-notify` grün. Updates als `flipscout`: `sudo -u flipscout git pull`.
 - Windows-PC: Bot beendet und gelöscht.
 - Dienst läuft (enabled) mit 6 aktiven Kategorie-Suchen (seit 17.11.2026), Preise vom
-  Besitzer in `profiles.toml` (nicht im Repo, Sicherung in `data/profiles.toml.bak-*`):
+  Besitzer in `profiles.toml` (seit 18.11.2026 auf Wunsch des Besitzers im öffentlichen Repo; Sicherungen in `data/profiles.toml.bak-*`):
   iPhone (Handys 3661 + Apple 54661, Preisliste pro Modell, nur iCloud-Sperre schließt aus),
   MacBook ab 2020 (Laptops 3580 + Apple, < 250 €), Nintendo Switch (Konsolen 3025 +
   Nintendo 77600; Lite 40, normal 70, OLED 90), Grafikkarten (3602; 1080 Ti 100,

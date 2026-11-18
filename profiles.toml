@@ -1,0 +1,278 @@
+# flip-scout – Einstellungen und Profile (Server)
+# Nach Änderungen: sudo systemctl restart flip-scout
+#
+# Suchen selbst verwaltest du per Telegram (Vinted-Link an den Bot schicken, /menu).
+# Profile legen fest, WIE eine Anzeige geprüft wird.
+# Sicherung der alten Version: data/profiles.toml.bak-2026-11-17
+
+[settings]
+domain = "at"                 # vinted.at
+interval_minutes = 3          # seit 18.11.2026 (vorher 5); nicht kleiner als 3. Bei Block-Warnung zurück auf 5
+max_age_minutes = 60          # Pause länger als das -> zuerst nur den Bestand merken
+heartbeat_hour = 9            # tägliche "läuft"-Meldung (Ortszeit)
+alarm_after_failed_runs = 3   # "Vinted blockiert evtl."-Alarm
+timezone = "Europe/Vienna"
+no_feedback_max_price = 50    # Verkäufer ohne Bewertungen: nur Anzeigen bis zu diesem Preis
+
+[ai]
+enabled = true
+model = "claude-haiku-5-5"
+max_images = 3                # Fotos pro Anzeige im Foto-Check
+max_checks_per_day = 3000     # Kostenbremse: KI-Aufrufe pro Tag
+price_input_per_mtok = 0.10   # nur für die Kostenanzeige in /status (USD)
+price_output_per_mtok = 0.50
+
+
+# ---------------------------------------------------------------------------
+# PROFILE
+# Felder (alle optional):
+#   label, emoji        Anzeige in Telegram
+#   exclude             Ausschlusswörter NUR im Titel (Teilwort, z.B. "hülle")
+#   exclude_desc        Ausschlusswörter in Titel UND Beschreibung (z.B. "ich suche")
+#   require_any         Mindestens EINES muss in Titel oder Beschreibung stehen,
+#                       sonst wird die Anzeige ohne KI übersprungen (spart Kosten)
+#   must_include        ALLE müssen vorkommen  -> sofort Treffer (ohne KI-Prüfung)
+#   any_include         EINES muss vorkommen   -> sofort Treffer (ohne KI-Prüfung)
+#   min_price           Mindestpreis in €
+#   ai_check            Was die KI prüfen soll. Leer = jede Anzeige, die die Filter
+#                       besteht, ist ein Treffer.
+#   briefing            KI-Kurzbriefing mit Fotos bei Treffern (Standard: true)
+#   ok_defects          Defekte, die okay sind (leer = Zustand egal)
+#   no_go               Ausschlussgründe (leer = keine)
+#   check_icloud        iCloud-/Aktivierungssperre ist ein Ausschluss
+#   max_prices          Höchstpreis pro Modell. Die KI ordnet exakt einem Schlüssel zu.
+#                       Hat die Suche keinen eigenen Höchstpreis, gilt: Vinted wird nur
+#                       bis zum höchsten Tabellenpreis abgefragt, und Modelle, die nicht
+#                       in der Tabelle stehen, werden nie gemeldet.
+# ---------------------------------------------------------------------------
+
+[profile.standard]
+label = "Normal"
+emoji = "🛍"
+exclude = ["hülle", "case", "tasche", "nur ovp", "leere ovp", "ovp leer", "nur karton", "defekt", "kaputt", "bastler", "ersatzteil"]
+exclude_desc = ["ich suche", "nur tausch", "nur karton", "nur die ovp"]
+briefing = true
+
+[profile.iphone_defekt]
+label = "iPhone"
+emoji = "📱"
+exclude = ["nur gehäuse", "leergehäuse", "akku für"]
+exclude_desc = ["ich suche", "attrappe", "dummy", "nur tausch"]
+ai_check = "Ein echtes Apple iPhone als komplettes Gerät. Zustand egal, auch defekt. Kein Zubehör, keine Einzelteile, kein leeres Gehäuse, keine Attrappe, keine Suchanzeige."
+ok_defects = []
+no_go = []
+check_icloud = true
+min_seller_feedback = 1       # nur Verkäufer mit mindestens 1 Bewertung (egal welcher Preis)
+interval_minutes = 1          # iPhone öfter als der Rest (seit 18.11.2026), Untergrenze 1
+# Kostenlose Vorprüfung: Steht genau ein Modell im Titel, prüft der Bot Preisliste und
+# Preis selbst, ohne Anzeigenseite und ohne KI. Diese Modelle werden nie gemeldet:
+title_models = true
+title_skip_models = ["iPhone 3G", "iPhone 4", "iPhone 5", "iPhone 6", "iPhone 7", "iPhone 8",
+                     "iPhone X", "iPhone 10", "iPhone XR", "iPhone XS", "iPhone SE"]
+
+[profile.iphone_defekt.max_prices]
+# Varianten, die nicht extra genannt wurden, haben den Preis des nächsten Modells
+"iPhone 11" = 30
+"iPhone 11 Pro" = 30
+"iPhone 11 Pro Max" = 30
+"iPhone 12" = 60
+"iPhone 12 mini" = 60
+"iPhone 12 Pro" = 60
+"iPhone 12 Pro Max" = 60
+"iPhone 13" = 80
+"iPhone 13 mini" = 80
+"iPhone 13 Pro" = 100
+"iPhone 13 Pro Max" = 100
+"iPhone 14" = 150
+"iPhone 14 Plus" = 150
+"iPhone 14 Pro" = 150
+"iPhone 14 Pro Max" = 150
+"iPhone 15" = 240
+"iPhone 15 Plus" = 240
+"iPhone 15 Pro" = 300
+"iPhone 15 Pro Max" = 300
+"iPhone 16" = 350
+"iPhone 16 Plus" = 350
+"iPhone 16e" = 350
+"iPhone 16 Pro" = 400
+"iPhone 16 Pro Max" = 400
+"iPhone 17" = 400
+"iPhone 17 Pro" = 400
+"iPhone 17 Pro Max" = 400
+"iPhone Air" = 400
+
+[profile.macbook_defekt]
+label = "MacBook ab 2020"
+emoji = "💻"
+# Modelle, die im Titel klar als älter als 2020 erkennbar sind, kostenlos aussortieren
+exclude = ["2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019"]
+exclude_desc = ["ich suche", "nur tausch"]
+ai_check = """Ein Apple MacBook (Air oder Pro) als komplettes Gerät, Zustand egal, auch defekt.
+Nur Modelle, die 2020 oder später erschienen sind: MacBook Air 2020 (Intel, A2179) und alle mit
+Apple-Chip (M1 bis M5), MacBook Pro 13 Zoll 2020 (Intel, A2251/A2289) und neuer.
+Titel sind oft ungenau: Bestimme Modell und Baujahr vor allem aus Beschreibung und Fotos
+(z.B. 'Über diesen Mac', Modellnummer A#### auf der Unterseite, Chip-Angabe).
+Achtung, ältere Modelle sehen gleich aus: A1932 (Air 2018/2019) und A2141 (Pro 16 Zoll 2019)
+und A2159 (Pro 13 Zoll 2019) sind ZU ALT. Ist das Baujahr nicht erkennbar: modell_key 'keins'.
+Kein Zubehör, keine Einzelteile, keine Suchanzeige."""
+ok_defects = []
+no_go = []
+check_icloud = true
+
+[profile.macbook_defekt.max_prices]
+"MacBook Air (2020 oder neuer)" = 249
+"MacBook Pro (2020 oder neuer)" = 249
+
+[profile.switch]
+label = "Nintendo Switch"
+emoji = "🎮"
+require_any = ["switch"]
+exclude = ["nur ovp", "leere ovp", "ovp leer", "nur karton"]
+exclude_desc = ["ich suche", "nur tausch", "nur karton", "nur die ovp"]
+ai_check = """Eine Nintendo Switch Konsole: Switch Lite, normale Switch (V1/V2) oder Switch OLED.
+Zustand egal, auch defekt. Zubehör, Dock und Joy-Cons dürfen fehlen. Die Konsole selbst
+(das Gerät mit Bildschirm) muss aber dabei sein. passt = 'nein' bei: nur Dock, nur Ladekabel,
+nur Joy-Cons/Controller, nur Hülle, nur Spiele, nur Karton, Einzelteile, Suchanzeige.
+Nintendo Switch 2 ist ein anderes Modell (modell_key 'keins')."""
+ok_defects = []
+no_go = []
+check_icloud = false
+
+[profile.switch.max_prices]
+"Switch Lite" = 40
+"Switch (normal, V1/V2)" = 50
+"Switch OLED" = 50
+
+[profile.gpu]
+label = "Grafikkarte"
+emoji = "🖥"
+require_any = ["1080", "3060"]
+exclude = ["defekt", "kaputt", "bastler", "für teile", "laptop", "notebook"]
+exclude_desc = ["ich suche", "nur tausch"]
+ai_check = """Eine einzelne, funktionsfähige Desktop-Grafikkarte: genau NVIDIA GeForce GTX 1080 Ti
+oder RTX 3060 oder RTX 3060 Ti. Andere Modelle (z.B. GTX 1080 ohne Ti, RTX 3050, RTX 3070)
+haben modell_key 'keins'. Kein kompletter PC oder Laptop, keine Suchanzeige."""
+ok_defects = []
+no_go = ["defekt oder nur teilweise funktionsfähig", "Bildfehler/Artefakte", "ungetestet oder als Bastlerware verkauft"]
+check_icloud = false
+
+[profile.gpu.max_prices]
+"GTX 1080 Ti" = 100
+"RTX 3060" = 199
+"RTX 3060 Ti" = 199
+
+[profile.ram_ddr4]
+label = "DDR4-RAM"
+emoji = "🧠"
+exclude = ["ddr3", "ddr2", "ddr5", "pc3-", "pc2-", "pc5-",
+           "2x4", "4x4", "2 x 4", "4 x 4", "2x 4", "4x 4", "2 x4", "4 x4"]   # Kits aus 4-GB-Riegeln
+exclude_desc = ["ich suche", "nur tausch"]
+ai_check = """Arbeitsspeicher (RAM-Riegel, Desktop DIMM oder Laptop SO-DIMM), NUR Typ DDR4.
+Der Preis gilt für die Gesamtkapazität der Anzeige (Kit 2x8 GB = 16 GB, 2x16 GB = 32 GB).
+NICHT gewünscht sind Riegel mit nur 4 GB (oder weniger) pro Stück, auch als Kit (2x4 GB, 4x4 GB):
+dann modell_key 'keins'. Jeder Riegel muss mindestens 8 GB haben. Die Anzahl der Riegel aus Text
+und Fotos bestimmen; ist sie nicht erkennbar, gilt die genannte Kapazität als ein Riegel/Kit.
+Den Typ bestimmen: Text ('DDR4', 'PC4-2133/2400/2666/3200') und Etikett auf den Fotos
+('PC4-...' = DDR4, 'PC3-...' = DDR3, 'PC5-...' = DDR5). Steht der Typ nicht eindeutig im Text
+und sind noch keine Fotos da: passt = 'unklar' und modell_key = 'keins'. Nur wenn DDR4 sicher
+ist, einen DDR4-Schlüssel wählen. Andere Kapazitäten (z.B. 4 GB, 64 GB) haben modell_key 'keins'.
+WICHTIG: Der Schlüssel hängt NUR von Typ (DDR4) und Gesamtkapazität ab. Ob Einzelriegel oder Kit,
+Desktop oder Laptop (SO-DIMM), Takt und Marke sind egal. Stehen DDR4 und die Kapazität im Text,
+wähle den passenden Schlüssel sofort, auch ohne Fotos. Ist nur unklar, ob '16 GB' ein Riegel oder
+die Summe eines Kits ist, nimm die genannte Zahl als Gesamtkapazität.
+Kein RAM in einem Gerät verbaut, keine Suchanzeige."""
+ok_defects = []
+no_go = ["defekt oder ungetestet"]
+check_icloud = false
+
+[profile.ram_ddr4.max_prices]
+"DDR4 8 GB" = 10
+"DDR4 16 GB" = 30
+"DDR4 32 GB" = 60
+
+
+# ---------------------------------------------------------------------------
+# START-SUCHEN: keine mehr. Alle Suchen stehen in der Datenbank und werden per
+# Telegram verwaltet (/menu).
+# ---------------------------------------------------------------------------
+
+[profile.minipc]
+label = "Mini-PC"
+emoji = "📦"
+cpu_check = "minipc"          # Prozessor prüft rules.py nach festen Regeln (cpu.py), Mobil-CPU nötig
+exclude = ["defekt", "kaputt", "bastler", "für teile", "imac", "celeron", "pentium", "atom",
+           "athlon", "core 2", "core2"]
+exclude_desc = ["ich suche", "nur tausch"]
+ai_check = """Ein funktionsfähiger Mini-PC (sehr kleines Gehäuse, etwa Buchgröße): z.B. Intel NUC,
+Lenovo ThinkCentre Tiny, HP EliteDesk/ProDesk Mini, Dell OptiPlex Micro, Beelink, Minisforum,
+GMKtec, Trigkey. Kein Tower, kein SFF-Desktop, kein Laptop. RAM und SSD dürfen fehlen, das ist
+KEIN Defekt. modell_key: 'Mini-PC', wenn es ein solcher Mini-PC ist (der Prozessor wird separat
+geprüft), sonst 'keins'. Keine Suchanzeige."""
+ok_defects = []
+no_go = ["defekt oder startet nicht", "als Bastlerware oder für Teile verkauft"]
+check_icloud = false
+
+[profile.minipc.max_prices]
+"Mini-PC" = 100
+
+# Sparsamer Laptop. Prozessor (cpu.py): Mobil-CPU, mind. 4 Kerne; Intel N100/N150/N200/N250/
+# N300/N305, Core i3 ab 11. Gen (mit 4+ Kernen), i5/i7 ab 8. Gen, Core Ultra, Ryzen 5/7 ab 3000,
+# Ryzen 3 ab 4000, Apple M. Nie: Chromebook, MediaTek, Snapdragon, Celeron, Pentium, Atom, Athlon.
+[profile.laptop]
+label = "Laptop (sparsam)"
+emoji = "🔋"
+cpu_check = "laptop"
+exclude = ["für teile", "chromebook", "chrome book", "mediatek", "snapdragon", "celeron",
+           "pentium", "atom", "athlon", "core 2", "core2",
+           "i3-2", "i3-3", "i3-4", "i3-5", "i3-6", "i3-7", "i3-8", "i3-10",
+           "i5-2", "i5-3", "i5-4", "i5-5", "i5-6", "i5-7", "i7-2", "i7-3", "i7-4", "i7-5", "i7-6", "i7-7"]
+exclude_desc = ["ich suche", "nur tausch", "chromebook", "chrome os", "chromeos"]
+ai_check = """Ein funktionsfähiger Laptop/Notebook mit Windows oder Linux (alle Marken), KEIN
+Chromebook und kein Tablet ohne Tastatur. RAM, SSD, Akku-Zustand und Ladegerät sind egal: RAM oder
+SSD dürfen fehlen, das ist KEIN Defekt. Ein kaputtes Display (gesprungen, Streifen, kein Bild am
+internen Bildschirm) ist ebenfalls OKAY, genauso Tastatur, Akku, Scharnier oder Gehäuseschäden –
+wichtig ist nur, dass der Laptop selbst startet und läuft. modell_key: 'Laptop', wenn es ein
+solcher Laptop ist (der Prozessor wird separat geprüft), sonst 'keins'. Keine Suchanzeige, keine
+Einzelteile (nur Display, nur Mainboard)."""
+ok_defects = []
+no_go = ["startet nicht / kein Lebenszeichen", "Mainboard-/Platinendefekt oder Wasserschaden", "ausdrücklich ungetestet oder nur für Teile verkauft"]
+check_icloud = false
+
+[profile.laptop.max_prices]
+"Laptop" = 100
+
+[profile.ryzen]
+label = "Ryzen-CPU"
+emoji = "🔲"
+exclude = ["athlon", "phenom", "sempron", "opteron", "epyc", "threadripper", " fx-", " fx ", "a10-", "a8-", "a6-", "nur ovp", "leere ovp", "nur karton"]
+exclude_desc = ["ich suche", "nur tausch"]
+ai_check = """Ein funktionsfähiger AMD Ryzen Desktop-Prozessor (CPU). Ein Bundle mit Mainboard/RAM/Kühler
+ist okay, wenn die CPU dabei ist. passt = 'nein' bei: nur Kühler, nur Verpackung, Laptop,
+kompletter PC, Suchanzeige.
+modell_key nach Modellnummer:
+- 'Ryzen 1000er' = 1200, 1300X, 1400, 1500X, 1600, 1600X, 1700, 1700X, 1800X (auch '1600 AF')
+- 'Ryzen 2000er' = z.B. 2200G, 2400G, 2600, 2600X, 2700, 2700X
+- 'Ryzen 3000er (außer 3900)' = z.B. 3100, 3200G, 3300X, 3400G, 3500X, 3600, 3600X, 3700X,
+  3800X, 3800XT
+- 'Ryzen 9 3900 / 3900X / 3900XT / 3950X'
+- 'Ryzen 4000er' = z.B. 4100, 4500, 4600G, 4650G, 4700G
+- 'Ryzen 5000er bis 5600X' = 5300G, 5500, 5500GT, 5600, 5600G, 5600GT, 5600X, 5600XT
+- 'Ryzen 5000er über 5600X' = 5700, 5700G, 5700X, 5800, 5800X, 5900X, 5950X
+- 'Ryzen X3D' = jeder Prozessor mit X3D im Namen (z.B. 5500X3D, 5600X3D, 5700X3D, 5800X3D,
+  7800X3D, 7950X3D, 9800X3D). X3D geht immer vor der Generation.
+Alle anderen (z.B. Ryzen 7000er/9000er ohne X3D, Laptop-Ryzen, Athlon): modell_key 'keins'.
+Steht die genaue Modellnummer nicht im Text: passt = 'unklar' und modell_key = 'keins'; dann
+auf den Fotos die Aufschrift auf dem Prozessor (Heatspreader) oder der Verpackung lesen."""
+ok_defects = []
+no_go = ["defekt, verbogene/abgebrochene Pins oder ungetestet"]
+check_icloud = false
+
+[profile.ryzen.max_prices]
+"Ryzen 1000er" = 10
+"Ryzen 2000er" = 20
+"Ryzen 3000er (außer 3900)" = 30
+"Ryzen 9 3900 / 3900X / 3900XT / 3950X" = 40
+"Ryzen 4000er" = 50
+"Ryzen 5000er bis 5600X" = 50
+"Ryzen 5000er über 5600X" = 90
+"Ryzen X3D" = 130
