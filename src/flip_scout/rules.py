@@ -38,6 +38,14 @@ def price_limit(profile: Profile, search: Search) -> float | None:
     return max(profile.max_prices.values()) if profile.max_prices else None
 
 
+def min_price(profile: Profile, search: Search, everywhere: float | None) -> float | None:
+    """Lowest price worth looking at: the search's or profile's own limit, but never
+    below the limit for all searches."""
+    own = search.min_price if search.min_price is not None else profile.min_price
+    limits = [x for x in (own, everywhere) if x is not None]
+    return max(limits) if limits else None
+
+
 def seller_problem(item, no_feedback_max_price: float | None, min_feedback: int = 0) -> str | None:
     """Reason to skip because of the seller, or None. Unknown ratings never block."""
     if item.seller_feedback is None:

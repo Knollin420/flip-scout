@@ -13,6 +13,7 @@ heartbeat_hour = 9            # tägliche "läuft"-Meldung (Ortszeit)
 alarm_after_failed_runs = 3   # "Vinted blockiert evtl."-Alarm
 timezone = "Europe/Vienna"
 no_feedback_max_price = 50    # Verkäufer ohne Bewertungen: nur Anzeigen bis zu diesem Preis
+min_price_everywhere = 3      # alle Suchen: Anzeigen unter 3 € sind meist Lockangebote
 # Ausschlusswörter für ALLE Suchen (Titel und Beschreibung, kostenlos vor der KI)
 exclude_everywhere = [
     "nur vinted go", "nur über vinted go", "nur per vinted go", "nur mit vinted go", "nur vinted-go",

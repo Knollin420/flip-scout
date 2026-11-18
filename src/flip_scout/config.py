@@ -27,6 +27,8 @@ class Settings:
     alarm_after_failed_runs: int = 3
     timezone: str = "Europe/Vienna"
     seen_retention_days: int = 30
+    # Lowest price for every search (listings below are bait offers); None = no limit
+    min_price_everywhere: float | None = None
     # Words that exclude a listing in every search (title and description, before the AI)
     exclude_everywhere: list[str] = field(default_factory=list)
     # Sellers without any rating: only listings up to this price (None = no limit)

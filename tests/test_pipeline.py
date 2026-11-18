@@ -415,3 +415,25 @@ def test_exclude_everywhere_in_title_and_description(env, store, cfg):
     vinted.descriptions[2] = "Envoi UNIQUEMENT  Vinted Go, merci"
     pipe.run_once()
     assert {c[1] for c in ai.calls} == {3}
+
+
+def test_min_price_everywhere(env, store, cfg):
+    cfg.settings.min_price_everywhere = 3
+    ai = FakeAI(ai_answer(modell_key="iPhone 12"))
+    pipe, vinted, _, _ = env(ai)
+    store.add_search("S", "iphone", [""])
+    pipe.run_once()
+    assert vinted.calls[0][2] == 3  # Vinted is asked from 3 € on
+    vinted.results[""] = [make_item(1, price=1), make_item(2, price=2.99), make_item(3, price=3)]
+    pipe.run_once()
+    assert {c[1] for c in ai.calls} == {3}  # exactly 3 € is still fine
+
+
+def test_own_min_price_higher_than_everywhere_wins(store, cfg):
+    from flip_scout.rules import min_price
+    from flip_scout.store import Search
+
+    p = cfg.profiles["iphone"]
+    assert min_price(p, Search(1, "S"), 3) == 3
+    assert min_price(p, Search(1, "S", min_price=30), 3) == 30
+    assert min_price(p, Search(1, "S"), None) is None

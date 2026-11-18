@@ -23,6 +23,7 @@ from .rules import (
     decide,
     find_word,
     keyword_hit,
+    min_price,
     price_limit,
     seller_problem,
     title_problem,
@@ -136,7 +137,7 @@ class Pipeline:
             if only_due and not self.is_due(search, profile):
                 continue
             self.last_searched[search.id] = self.now()
-            price_from = search.min_price if search.min_price is not None else profile.min_price
+            price_from = min_price(profile, search, self.cfg.settings.min_price_everywhere)
             candidates: list[Item] = []
             for term in search.terms:
                 if not self._still_active(search.id):
@@ -220,9 +221,9 @@ class Pipeline:
             return self._skip(search, item, "reserviert/verkauft")
         if item.promoted:
             return self._skip(search, item, "beworbene (hochgeschobene) Anzeige")
-        min_price = search.min_price if search.min_price is not None else profile.min_price
-        if min_price is not None and item.price < min_price:
-            return self._skip(search, item, f"unter Mindestpreis {min_price:.0f} €")
+        lowest = min_price(profile, search, s.min_price_everywhere)
+        if lowest is not None and item.price < lowest:
+            return self._skip(search, item, f"unter Mindestpreis {lowest:g} €")
         max_price = price_limit(profile, search)
         if max_price is not None and item.price > max_price:
             return self._skip(search, item, f"über Höchstpreis {max_price:.0f} €")
