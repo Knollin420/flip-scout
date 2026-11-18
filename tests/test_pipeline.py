@@ -399,3 +399,19 @@ def test_cpu_check_decided_by_rules_not_ai(store):
     unknown = ai_answer(passt="unklar", modell_key="keins", cpu="", cpu_kerne=0)
     assert decide(p, s, 50, unknown, final=False).notify  # text: unclear -> photo check
     assert not decide(p, s, 50, unknown, final=True).notify  # still unknown after photos
+
+
+def test_exclude_everywhere_in_title_and_description(env, store, cfg):
+    cfg.settings.exclude_everywhere = ["nur vinted go", "uniquement vinted go"]
+    ai = FakeAI(ai_answer())
+    pipe, vinted, _, _ = env(ai)
+    store.add_search("S", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [
+        make_item(1, title="iPhone 13 Pro (nur Vinted Go)"),
+        make_item(2, title="iPhone 13 Pro"),
+        make_item(3, title="iPhone 13 Pro"),
+    ]
+    vinted.descriptions[2] = "Envoi UNIQUEMENT  Vinted Go, merci"
+    pipe.run_once()
+    assert {c[1] for c in ai.calls} == {3}

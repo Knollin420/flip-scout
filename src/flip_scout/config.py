@@ -27,6 +27,8 @@ class Settings:
     alarm_after_failed_runs: int = 3
     timezone: str = "Europe/Vienna"
     seen_retention_days: int = 30
+    # Words that exclude a listing in every search (title and description, before the AI)
+    exclude_everywhere: list[str] = field(default_factory=list)
     # Sellers without any rating: only listings up to this price (None = no limit)
     no_feedback_max_price: float | None = None
 

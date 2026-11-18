@@ -13,6 +13,14 @@ heartbeat_hour = 9            # tägliche "läuft"-Meldung (Ortszeit)
 alarm_after_failed_runs = 3   # "Vinted blockiert evtl."-Alarm
 timezone = "Europe/Vienna"
 no_feedback_max_price = 50    # Verkäufer ohne Bewertungen: nur Anzeigen bis zu diesem Preis
+# Ausschlusswörter für ALLE Suchen (Titel und Beschreibung, kostenlos vor der KI)
+exclude_everywhere = [
+    "nur vinted go", "nur über vinted go", "nur per vinted go", "nur mit vinted go", "nur vinted-go",
+    "uniquement vinted go", "uniquement via vinted go", "uniquement par vinted go", "uniquement vinted-go",
+    "seulement vinted go", "seulement via vinted go",
+    "solo vinted go", "solo con vinted go", "solo tramite vinted go", "solo via vinted go",
+    "only vinted go", "only via vinted go",
+]
 
 [ai]
 enabled = true
@@ -72,28 +80,29 @@ title_skip_models = ["iPhone 3G", "iPhone 4", "iPhone 5", "iPhone 6", "iPhone 7"
 
 [profile.iphone_defekt.max_prices]
 # Varianten, die nicht extra genannt wurden, haben den Preis des nächsten Modells
+# 18.11.2026: 12er-Reihe 40 €, 14er-Reihe max. 129 €, 16e unter 250 €
 "iPhone 11" = 30
 "iPhone 11 Pro" = 30
 "iPhone 11 Pro Max" = 30
-"iPhone 12" = 60
-"iPhone 12 mini" = 60
-"iPhone 12 Pro" = 60
-"iPhone 12 Pro Max" = 60
+"iPhone 12" = 40
+"iPhone 12 mini" = 40
+"iPhone 12 Pro" = 40
+"iPhone 12 Pro Max" = 40
 "iPhone 13" = 80
 "iPhone 13 mini" = 80
 "iPhone 13 Pro" = 100
 "iPhone 13 Pro Max" = 100
-"iPhone 14" = 150
-"iPhone 14 Plus" = 150
-"iPhone 14 Pro" = 150
-"iPhone 14 Pro Max" = 150
+"iPhone 14" = 129
+"iPhone 14 Plus" = 129
+"iPhone 14 Pro" = 129
+"iPhone 14 Pro Max" = 129
 "iPhone 15" = 240
 "iPhone 15 Plus" = 240
 "iPhone 15 Pro" = 300
 "iPhone 15 Pro Max" = 300
 "iPhone 16" = 350
 "iPhone 16 Plus" = 350
-"iPhone 16e" = 350
+"iPhone 16e" = 249
 "iPhone 16 Pro" = 400
 "iPhone 16 Pro Max" = 400
 "iPhone 17" = 400

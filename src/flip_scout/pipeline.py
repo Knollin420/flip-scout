@@ -226,7 +226,7 @@ class Pipeline:
         max_price = price_limit(profile, search)
         if max_price is not None and item.price > max_price:
             return self._skip(search, item, f"über Höchstpreis {max_price:.0f} €")
-        word = find_word(item.title, profile.exclude + profile.exclude_desc)
+        word = find_word(item.title, profile.exclude + profile.exclude_desc + s.exclude_everywhere)
         if word:
             return self._skip(search, item, f"Ausschlusswort im Titel: {word!r}")
         problem = title_problem(profile, item.title, item.price)
@@ -237,7 +237,7 @@ class Pipeline:
         self._pause(s.pause_between_details)
         self.vinted.load_details(item)
         self._count("details")
-        word = find_word(item.description, profile.exclude_desc)
+        word = find_word(item.description, profile.exclude_desc + s.exclude_everywhere)
         if word:
             return self._skip(search, item, f"Ausschlusswort in Beschreibung: {word!r}")
 
