@@ -111,6 +111,34 @@ title_skip_models = ["iPhone 3G", "iPhone 4", "iPhone 5", "iPhone 6", "iPhone 7"
 "iPhone 17 Pro Max" = 400
 "iPhone Air" = 400
 
+[profile.pixel]
+label = "Google Pixel"
+emoji = "📲"
+exclude = ["nur gehäuse", "leergehäuse", "akku für", "attrappe", "dummy"]
+exclude_desc = ["ich suche", "nur tausch"]
+ai_check = """Ein echtes Google Pixel Smartphone als komplettes Gerät. Zustand egal, auch defekt
+(Display, Akku, Kamera, Rückglas usw.). Kein Zubehör, keine Einzelteile, kein leeres Gehäuse,
+keine Attrappe, keine Suchanzeige. Pixel 9a und 10a sind eigene, günstigere Modelle (modell_key
+'keins'), ebenso Pixel 8 und älter sowie Pixel 11."""
+ok_defects = []
+no_go = ["an ein fremdes Google-Konto gebunden (FRP-/Kontosperre) oder per Fernsperre gesperrt"]
+check_icloud = false
+# Kostenlose Vorprüfung im Titel (wie beim iPhone); diese Modelle werden nie gemeldet:
+title_models = true
+title_skip_models = ["Pixel 3", "Pixel 4", "Pixel 5", "Pixel 6", "Pixel 7", "Pixel 8",
+                     "Pixel 9a", "Pixel 10a", "Pixel 11"]
+
+[profile.pixel.max_prices]
+# Varianten (Pro XL, Pro Fold) wie das nächste genannte Modell
+"Pixel 9" = 250
+"Pixel 9 Pro" = 250
+"Pixel 9 Pro XL" = 250
+"Pixel 9 Pro Fold" = 250
+"Pixel 10" = 350
+"Pixel 10 Pro" = 350
+"Pixel 10 Pro XL" = 350
+"Pixel 10 Pro Fold" = 350
+
 [profile.macbook_defekt]
 label = "MacBook ab 2020"
 emoji = "💻"
@@ -265,8 +293,10 @@ modell_key nach Modellnummer:
 - 'Ryzen 3000er (außer 3900)' = z.B. 3100, 3200G, 3300X, 3400G, 3500X, 3600, 3600X, 3700X,
   3800X, 3800XT
 - 'Ryzen 9 3900 / 3900X / 3900XT / 3950X'
-- 'Ryzen 4000er' = z.B. 4100, 4500, 4600G, 4650G, 4700G
-- 'Ryzen 5000er bis 5600X' = 5300G, 5500, 5500GT, 5600, 5600G, 5600GT, 5600X, 5600XT
+- 'Ryzen 5 4500' = nur der Ryzen 5 4500 (eigener Preis)
+- 'Ryzen 4000er' = alle anderen 4000er, z.B. 4100, 4600G, 4650G, 4700G
+- 'Ryzen 5 5500' = nur der Ryzen 5 5500 (eigener Preis; 5500GT gehört NICHT dazu)
+- 'Ryzen 5000er bis 5600X' = 5300G, 5500GT, 5600, 5600G, 5600GT, 5600X, 5600XT
 - 'Ryzen 5000er über 5600X' = 5700, 5700G, 5700X, 5800, 5800X, 5900X, 5950X
 - 'Ryzen X3D' = jeder Prozessor mit X3D im Namen (z.B. 5500X3D, 5600X3D, 5700X3D, 5800X3D,
   7800X3D, 7950X3D, 9800X3D). X3D geht immer vor der Generation.
@@ -282,7 +312,9 @@ check_icloud = false
 "Ryzen 2000er" = 20
 "Ryzen 3000er (außer 3900)" = 30
 "Ryzen 9 3900 / 3900X / 3900XT / 3950X" = 40
+"Ryzen 5 4500" = 40
 "Ryzen 4000er" = 50
+"Ryzen 5 5500" = 55
 "Ryzen 5000er bis 5600X" = 50
 "Ryzen 5000er über 5600X" = 90
 "Ryzen X3D" = 130
