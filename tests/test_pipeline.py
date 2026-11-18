@@ -341,3 +341,26 @@ def test_unknown_seller_ratings_never_block(env, store, cfg):
     vinted.results[""] = [make_item(1, price=120)]
     assert pipe.run_once().hits == 1
     assert "Bewertungen unbekannt" in notifier.hits[0]
+
+
+def test_title_check_skips_before_page_load_and_ai(env, store, cfg):
+    cfg.profiles["iphone"].title_models = True
+    cfg.profiles["iphone"].title_skip_models = ["iPhone 8"]
+    ai = FakeAI(ai_answer(modell_key="iPhone 12"))
+    pipe, vinted, _, notifier = env(ai)
+    store.add_search("S", "iphone", [""])
+    pipe.run_once()
+    vinted.results[""] = [
+        make_item(1, title="iPhone 13 Pro", price=170),  # 13 Pro: 180 € -> price fits, AI checks
+        make_item(2, title="iPhone 12", price=120),  # 12: 90 € -> out by title
+        make_item(3, title="iPhone 8", price=40),  # not wanted -> out by title
+        make_item(4, title="Handy Apple", price=80),  # unclear -> AI decides
+    ]
+    vinted.load_details = lambda item, f=vinted.load_details: (
+        vinted.calls.append(("page", item.id)),
+        f(item),
+    )
+    pipe.run_once()
+    checked_by_ai = {c[1] for c in ai.calls}
+    assert checked_by_ai == {1, 4}
+    assert ("page", 2) not in vinted.calls and ("page", 3) not in vinted.calls

@@ -18,7 +18,15 @@ from dataclasses import dataclass
 from .ai import AIChecker, AIResponse, AIRetryLater, AIUnavailable
 from .config import Config, Profile
 from .notify import Notifier, format_hit
-from .rules import Decision, decide, find_word, keyword_hit, price_limit, seller_problem
+from .rules import (
+    Decision,
+    decide,
+    find_word,
+    keyword_hit,
+    price_limit,
+    seller_problem,
+    title_problem,
+)
 from .store import Search, Store
 from .vinted import Item, VintedClient, VintedError
 
@@ -204,6 +212,9 @@ class Pipeline:
         word = find_word(item.title, profile.exclude + profile.exclude_desc)
         if word:
             return self._skip(search, item, f"Ausschlusswort im Titel: {word!r}")
+        problem = title_problem(profile, item.title, item.price)
+        if problem:
+            return self._skip(search, item, problem)
 
         # 2. + 3. description
         self._pause(s.pause_between_details)
@@ -213,7 +224,7 @@ class Pipeline:
         if word:
             return self._skip(search, item, f"Ausschlusswort in Beschreibung: {word!r}")
 
-        problem = seller_problem(item, s.no_feedback_max_price)
+        problem = seller_problem(item, s.no_feedback_max_price, profile.min_seller_feedback)
         if problem:
             return self._skip(search, item, problem)
 

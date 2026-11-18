@@ -25,6 +25,16 @@ from .urlimport import parse_vinted_url
 log = logging.getLogger("flip_scout")
 
 
+MIN_GAP_SECONDS = 60.0
+
+
+def seconds_until_next_run(settings, elapsed: float, rand=random.uniform) -> float:
+    """Fixed rhythm: a run starts every interval (plus jitter), no matter how long the
+    previous run took. At least MIN_GAP_SECONDS pause after a very long run."""
+    cycle = settings.interval_minutes * 60 + rand(-settings.jitter_seconds, settings.jitter_seconds)
+    return max(MIN_GAP_SECONDS, cycle - elapsed)
+
+
 def import_seed_searches(cfg: Config, store: Store) -> None:
     """[[search]] entries from profiles.toml are imported once (deleted ones stay deleted)."""
     for seed in cfg.seed_searches:
@@ -169,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     pruned_day = ""
     log.info("flip-scout läuft – Intervall %.0f min", cfg.settings.interval_minutes)
     while not stop.is_set():
+        started = time.monotonic()
         try:
             result = pipeline.run_once()
             log.info(
@@ -186,9 +197,7 @@ def main(argv: list[str] | None = None) -> int:
                 pruned_day = today
         except Exception:
             log.exception("Unerwarteter Fehler im Durchlauf")
-        s = cfg.settings
-        wait = s.interval_minutes * 60 + random.uniform(-s.jitter_seconds, s.jitter_seconds)
-        stop.wait(max(60.0, wait))
+        stop.wait(seconds_until_next_run(cfg.settings, time.monotonic() - started))
     log.info("flip-scout beendet")
     return 0
 

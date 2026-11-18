@@ -347,3 +347,49 @@ def test_seller_ratings_from_page_need_matching_login():
 def test_seller_login_from_search():
     raw = {"id": 1, "title": "x", "price": {"amount": "5"}, "user": {"id": 9, "login": "anna"}}
     assert parse_catalog_item(raw, "https://www.vinted.at").seller_login == "anna"
+
+
+def test_title_model_detection():
+    from flip_scout.config import Profile
+    from flip_scout.rules import title_model, title_problem
+
+    p = Profile(
+        key="i",
+        max_prices={
+            "iPhone 13": 80,
+            "iPhone 13 Pro": 100,
+            "iPhone 13 Pro Max": 100,
+            "iPhone 16": 350,
+            "iPhone 16e": 350,
+            "iPhone Air": 400,
+        },
+        title_models=True,
+        title_skip_models=["iPhone 6", "iPhone X", "iPhone XR", "iPhone SE"],
+    )
+    assert title_model(p, "Apple iPhone13 Pro-Max 256GB") == "iPhone 13 Pro Max"
+    assert title_model(p, "iPhone 13 pro") == "iPhone 13 Pro"
+    assert title_model(p, "iPhone 13, weiß") == "iPhone 13"
+    assert title_model(p, "iPhone 16 e 128giga") == "iPhone 16e"
+    assert title_model(p, "iphone 6s 64gb") == "iPhone 6"  # 6s is not in the list
+    assert title_model(p, "Iphone XR 64G") == "iPhone XR"  # not 'iPhone X'
+    assert title_model(p, "iPhone 16") == "iPhone 16"  # not 'iPhone 6'
+    assert title_model(p, "Smartphone Apple") is None  # unclear -> AI
+    assert title_model(p, "Lot iPhone 13 + iPhone XR") is None  # two models -> AI
+    assert title_problem(p, "iPhone 13, weiß", 300) == "Titel: iPhone 13: 300 € > 80 €"
+    assert title_problem(p, "iPhone 13", 80) is None  # price fits -> normal checks
+    assert title_problem(p, "Iphone XR 64G", 20) == "Titel: iPhone XR nicht in Preisliste"
+    p.title_models = False
+    assert title_problem(p, "iPhone 13", 300) is None
+
+
+def test_min_seller_feedback_regardless_of_price():
+    from flip_scout.rules import seller_problem
+
+    item = make_item(1, price=20)
+    item.seller_feedback = 0
+    assert seller_problem(item, 50, 1)  # cheap, but 0 ratings -> out
+    assert seller_problem(item, 50, 0) is None  # other searches: fine under 50 €
+    item.seller_feedback = 1
+    assert seller_problem(item, 50, 1) is None
+    item.seller_feedback = None
+    assert seller_problem(item, 50, 1) is None  # unknown never blocks

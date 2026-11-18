@@ -9,6 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+# Lower limit for the search interval (Vinted bot protection). 3 minutes since 2026-11-18.
+MIN_INTERVAL_MINUTES = 3.0
+
 
 @dataclass
 class Settings:
@@ -64,6 +67,12 @@ class Profile:
     no_go: list[str] = field(default_factory=list)
     check_icloud: bool = False
     max_prices: dict[str, float] = field(default_factory=dict)
+    # Free model check in the title (before page load and AI): price keys are looked up
+    # by name, title_skip_models are models that are never reported.
+    title_models: bool = False
+    title_skip_models: list[str] = field(default_factory=list)
+    # Minimum number of seller ratings, regardless of price (unknown ratings never block)
+    min_seller_feedback: int = 0
 
     def __post_init__(self) -> None:
         if not self.label:
@@ -126,8 +135,11 @@ def load_config(
         if key in settings_raw:
             settings_raw[key] = tuple(settings_raw[key])
     settings = _pick(Settings, settings_raw)
-    if settings.interval_minutes < 5:
-        raise ValueError("interval_minutes muss mindestens 5 sein (Bot-Schutz von Vinted).")
+    if settings.interval_minutes < MIN_INTERVAL_MINUTES:
+        raise ValueError(
+            f"interval_minutes muss mindestens {MIN_INTERVAL_MINUTES:g} sein "
+            "(Bot-Schutz von Vinted)."
+        )
 
     ai = _pick(AISettings, raw.get("ai", {}))
 

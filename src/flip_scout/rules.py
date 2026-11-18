@@ -5,6 +5,7 @@ The AI only delivers data. Whether a listing is reported is decided here.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from .config import Profile
@@ -35,12 +36,59 @@ def price_limit(profile: Profile, search: Search) -> float | None:
     return max(profile.max_prices.values()) if profile.max_prices else None
 
 
-def seller_problem(item, no_feedback_max_price: float | None) -> str | None:
+def seller_problem(item, no_feedback_max_price: float | None, min_feedback: int = 0) -> str | None:
     """Reason to skip because of the seller, or None. Unknown ratings never block."""
-    if no_feedback_max_price is None or item.seller_feedback is None:
+    if item.seller_feedback is None:
         return None
-    if item.seller_feedback == 0 and item.price > no_feedback_max_price:
-        return f"Verkäufer ohne Bewertungen, Preis über {no_feedback_max_price:g} €"
+    if item.seller_feedback < min_feedback:
+        return f"Verkäufer hat weniger als {min_feedback} Bewertung(en)"
+    if no_feedback_max_price is not None and item.seller_feedback == 0:
+        if item.price > no_feedback_max_price:
+            return f"Verkäufer ohne Bewertungen, Preis über {no_feedback_max_price:g} €"
+    return None
+
+
+def _model_text(text: str) -> str:
+    """'Apple iPhone13 Pro-Max!' -> ' apple iphone 13 pro max ' (spaces around tokens)."""
+    text = re.sub(r"[^a-z0-9]+", " ", (text or "").lower())
+    text = re.sub(r"(?<=[a-z])(?=\d)|(?<=\d)(?=[a-z])", " ", text)
+    return f" {' '.join(text.split())} "
+
+
+def title_model(profile: Profile, title: str) -> str | None:
+    """The one model named in the title: a price key, a skip model, or None when no
+    model or several different models are named (then the AI decides)."""
+    names = [*profile.max_prices, *profile.title_skip_models]
+    hay = _model_text(title)
+    spans = []
+    for name in names:
+        needle = _model_text(name)
+        start = hay.find(needle)
+        while start != -1:
+            spans.append((start, start + len(needle), name))
+            start = hay.find(needle, start + 1)
+    # drop matches inside a longer one ('iPhone 13' inside 'iPhone 13 Pro')
+    kept = {
+        n
+        for s, e, n in spans
+        if not any(s2 <= s and e <= e2 and (e2 - s2) > (e - s) for s2, e2, _ in spans)
+    }
+    return kept.pop() if len(kept) == 1 else None
+
+
+def title_problem(profile: Profile, title: str, price: float) -> str | None:
+    """Free check before page load and AI: a model clearly named in the title that is
+    not wanted or too expensive. None = no decision, the normal checks follow."""
+    if not profile.title_models:
+        return None
+    model = title_model(profile, title)
+    if model is None:
+        return None
+    if model not in profile.max_prices:
+        return f"Titel: {model} nicht in Preisliste"
+    limit = profile.max_prices[model]
+    if price > limit:
+        return f"Titel: {model}: {price:.0f} € > {limit:.0f} €"
     return None
 
 

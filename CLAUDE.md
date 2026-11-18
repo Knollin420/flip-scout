@@ -1,6 +1,6 @@
 # flip-scout – Projektstand und Regeln für Claude
 
-Telegram-Bot, der Vinted (vinted.at) alle 5 Minuten durchsucht und neue passende Anzeigen
+Telegram-Bot, der Vinted (vinted.at) alle 3 Minuten durchsucht und neue passende Anzeigen
 mit KI-Briefing meldet. Gekauft wird immer manuell. Der Besitzer (Colin, Wien) spricht
 **Deutsch**: Antworten und Erklärungen auf Deutsch, einfach und Schritt für Schritt.
 Code, Commits und README auf Englisch.
@@ -18,7 +18,8 @@ Code, Commits und README auf Englisch.
   `.env` mit `chmod 600`, Besitzer `flipscout`.
 - Der Bot darf mit demselben Telegram-Token **nur an einer Stelle** laufen. Wenn er auf dem
   Server läuft, muss er auf dem Windows-PC des Besitzers gestoppt sein.
-- Vinted-Intervall nie unter 5 Minuten. Nicht mehr Suchbegriffe als nötig.
+- Vinted-Intervall nie unter 3 Minuten (Besitzer hat am 18.11.2026 von 5 auf 3 gesenkt;
+  bei Block-Warnungen zurück auf 5). Nicht mehr Suchbegriffe als nötig.
 
 ## Stand (November 2026)
 

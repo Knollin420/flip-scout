@@ -148,3 +148,26 @@ def test_unknown_filter_ids_are_shown_as_numbers():
     assert filter_text({"catalog_ids": "9999", "size_ids": "1,2"}) == (
         "Kategorie: 9999 · Größe: 2 gewählt"
     )
+
+
+def test_fixed_rhythm_between_runs():
+    from flip_scout.__main__ import seconds_until_next_run
+    from flip_scout.config import Settings
+
+    s = Settings(interval_minutes=3, jitter_seconds=20)
+    no_jitter = lambda a, b: 0  # noqa: E731
+    assert seconds_until_next_run(s, 40, no_jitter) == 140  # 180 s rhythm minus 40 s run
+    assert seconds_until_next_run(s, 170, no_jitter) == 60  # always at least 60 s pause
+
+
+def test_interval_below_three_minutes_is_refused(tmp_path):
+    import pytest
+
+    from flip_scout.config import load_config
+
+    f = tmp_path / "p.toml"
+    f.write_text("[settings]\ninterval_minutes = 2\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="mindestens 3"):
+        load_config(f)
+    f.write_text("[settings]\ninterval_minutes = 3\n", encoding="utf-8")
+    assert load_config(f).settings.interval_minutes == 3

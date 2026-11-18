@@ -7,7 +7,7 @@
 
 [settings]
 domain = "at"                 # vinted.at
-interval_minutes = 5          # nicht kleiner als 5 (Bot-Schutz)
+interval_minutes = 5          # nicht kleiner als 3 (Bot-Schutz)
 max_age_minutes = 60          # ältere Anzeigen werden ignoriert
 heartbeat_hour = 9            # tägliche "läuft"-Meldung (Ortszeit)
 alarm_after_failed_runs = 3   # "Vinted blockiert evtl."-Alarm
