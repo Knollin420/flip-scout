@@ -47,6 +47,10 @@ class Item:
     seller_login: str = ""
     seller_feedback: int | None = None  # number of ratings, None = unknown
     seller_rating: float | None = None  # 0..1 (Vinted's feedback_reputation)
+    source: str = "vinted"  # "vinted" or "willhaben"
+    location: str = ""  # willhaben: "Wien, 14. Bezirk, Penzing"
+    seller_name: str = ""  # willhaben: first name from the item page
+    private: bool | None = None  # willhaben: private seller (True) or company (False)
     photo_cache: dict = field(default_factory=dict, repr=False)  # url -> (bytes, type) | None
 
     def age_minutes(self, now: float | None = None) -> float | None:

@@ -31,7 +31,7 @@ Code, Commits und README auf Englisch.
   ProtectSystem/ProtectHome). `.env`, `profiles.toml` und `data/` vom PC übernommen,
   `--diagnose` und `--test-notify` grün. Updates als `flipscout`: `sudo -u flipscout git pull`.
 - Windows-PC: Bot beendet und gelöscht.
-- Dienst läuft (enabled) mit 6 aktiven Kategorie-Suchen (seit 17.11.2026), Preise vom
+- Dienst läuft (enabled), Vinted- und willhaben-Suchen (Stand 19.11.: 12 + 12) (seit 17.11.2026), Preise vom
   Besitzer in `profiles.toml` (seit 18.11.2026 auf Wunsch des Besitzers im öffentlichen Repo; Sicherungen in `data/profiles.toml.bak-*`):
   iPhone (Handys 3661 + Apple 54661, Preisliste pro Modell, nur iCloud-Sperre schließt aus),
   MacBook ab 2020 (Laptops 3580 + Apple, < 250 €), Nintendo Switch (Konsolen 3025 +
@@ -69,6 +69,25 @@ Code, Commits und README auf Englisch.
   stehen in den eingebetteten Next.js-Daten der Anzeigenseite, aber nur als f800 (600x800).
 - Die Detail-API ist blockiert. Beschreibung und Fotos kommen von der Anzeigenseite
   (JSON-LD / OpenGraph).
+
+## willhaben.at (seit 19.11.2026)
+
+- Jede Suche hat eine Quelle (`searches.source`: `vinted` oder `willhaben`). Zu jeder
+  Vinted-Suche gibt es eine Kopie „… · willhaben“ mit `params = {"path": "<kategorie-pfad>"}`.
+- Suche nur über Kategorie + `areaId=900` (Wien) + `ISPRIVATE=1` + `sort=1`, Seitendaten aus
+  `__NEXT_DATA__`. KEINE Suchbegriffe und KEIN Preisfilter in der URL (robots.txt schließt
+  `keyword=`/`PRICE_FROM`/`PRICE_TO` aus); Preis/Modell/Größe filtert der Bot selbst.
+  „Hochgeschobene“ Anzeigen sind Händler. Takt `willhaben_interval_minutes` (3 Min.).
+- Anzeigenseite liefert volle Beschreibung, große Fotos und Vornamen des Verkäufers
+  (`advertDetails.sellerProfileUserData.name`).
+- Preisgrenzen auf willhaben × `willhaben_price_factor` (1,2). Liegt ein Treffer über dem
+  eigentlichen Limit, schlägt die automatische Nachricht das Limit als Preis vor.
+- Automatische Nachricht (Wunsch des Besitzers): nach jedem willhaben-Treffer, nur Privat,
+  nicht wenn die KI unsicher war, max. 1 pro Anzeige, Tageslimit, Telegram `/nachrichten an|aus`.
+  Gesendet über `POST /webapi/iad-messaging/sendrequest` (gleiches JSON wie die Webseite) mit
+  dem Login-Cookie des Besitzers (`WILLHABEN_COOKIE` in `.env`, nie anzeigen). Login hat
+  reCAPTCHA: nie automatisch einloggen oder Captchas umgehen; bei abgelaufenem Cookie meldet
+  der Bot das in Telegram, der Besitzer trägt ein neues ein. Gekauft wird weiterhin nie.
 
 ## Architektur-Prinzipien (nicht ohne Rückfrage ändern)
 

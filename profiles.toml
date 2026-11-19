@@ -13,6 +13,49 @@ heartbeat_hour = 9            # tägliche "läuft"-Meldung (Ortszeit)
 alarm_after_failed_runs = 3   # "Vinted blockiert evtl."-Alarm
 timezone = "Europe/Vienna"
 no_feedback_max_price = 50    # Verkäufer ohne Bewertungen: nur Anzeigen bis zu diesem Preis
+# Nur Vinted: Bezahlung/Kontakt außerhalb von Vinted (kein Käuferschutz, typischer Betrug).
+# Kostenlos in Titel und Beschreibung; "nicht über WhatsApp" o. Ä. zählt nicht.
+vinted_exclude_words = [
+    # Deutsch
+    "nur überweisung", "nur per überweisung", "nur banküberweisung", "nur per banküberweisung",
+    "per überweisung statt", "nicht über vinted", "nicht via vinted", "ohne vinted", "außerhalb von vinted",
+    "ausserhalb von vinted", "außerhalb vinted", "nicht über die plattform", "paypal freunde",
+    "freunde und familie", "whatsapp",
+    # Englisch
+    "bank transfer only", "only bank transfer", "outside vinted", "outside of vinted", "not through vinted",
+    "not via vinted", "paypal friends", "friends and family",
+    # Französisch
+    "virement uniquement", "uniquement par virement", "uniquement virement", "paiement par virement",
+    "virement bancaire", "hors vinted", "en dehors de vinted", "sans passer par vinted", "pas via vinted",
+    "pas par vinted", "paypal entre proches",
+    # Italienisch
+    "solo bonifico", "pagamento con bonifico", "pagamento tramite bonifico", "bonifico bancario",
+    "fuori vinted", "fuori da vinted", "al di fuori di vinted", "non tramite vinted", "non su vinted",
+    "paypal amici", "amici e parenti",
+    # Spanisch / Portugiesisch
+    "solo transferencia", "transferencia bancaria", "fuera de vinted", "no por vinted", "bizum",
+    "paypal amigos", "só transferência", "transferência bancária", "fora do vinted", "mbway", "mb way",
+    # Niederländisch / Polnisch / Tschechisch
+    "alleen overboeken", "bankoverschrijving", "buiten vinted", "niet via vinted", "tikkie",
+    "tylko przelew", "przelew bankowy", "poza vinted", "nie przez vinted", "pouze převodem", "mimo vinted",
+]
+
+# --- willhaben.at (nur Wien, nur Privatanzeigen, alle 3 Minuten) -------------
+willhaben_enabled = true
+willhaben_area_id = 900               # 900 = Wien
+willhaben_interval_minutes = 3
+willhaben_private_only = true
+willhaben_price_factor = 1.2          # Preisgrenzen +20 %; darüber schlägt die Nachricht dein Limit vor
+willhaben_auto_message = true         # automatische Nachricht nach jedem willhaben-Treffer
+willhaben_max_messages_per_day = 20   # Sicherheitsgrenze
+willhaben_message = """Hallo {name},
+ich hätte großes Interesse. Ich wohne auch in der Nähe könnte es also Zeitnah abholen. Wäre das heute oder morgen noch möglich?
+vg,
+colin"""
+willhaben_message_offer = """Hallo {name},
+ich hätte großes Interesse. Wäre es für dich noch in Ordnung auf {limit} herunterzugehen? Ich wohne auch in der Nähe könnte es also Zeitnah abholen. Wäre das heute oder morgen noch möglich?
+vg,
+colin"""
 min_price_everywhere = 3      # alle Suchen: Anzeigen unter 3 € sind meist Lockangebote
 # Ausschlusswörter für ALLE Suchen (Titel und Beschreibung, kostenlos vor der KI)
 exclude_everywhere = [
@@ -138,6 +181,29 @@ title_skip_models = ["Pixel 3", "Pixel 4", "Pixel 5", "Pixel 6", "Pixel 7", "Pix
 "Pixel 10 Pro" = 350
 "Pixel 10 Pro XL" = 350
 "Pixel 10 Pro Fold" = 350
+
+[profile.nothing]
+label = "Nothing Phone (3)"
+emoji = "⚪"
+exclude = ["nur gehäuse", "leergehäuse", "attrappe", "dummy", "hülle für", "case für", "coque pour", "cover per"]
+exclude_desc = ["ich suche", "nur tausch", "je cherche", "cerco"]
+ai_check = """Genau das Smartphone Nothing Phone (3) als komplettes Gerät, Zustand egal (auch defekt).
+Prüfe Titel, Beschreibung UND Fotos genau, weil es leicht verwechselt wird:
+- Phone (3): auf der Rückseite oben rechts ein kleines rundes Punkt-LED-Display ('Glyph Matrix'),
+  keine langen Leuchtstreifen; Kamerainsel mit drei Kameras; Snapdragon 8s Gen 4.
+- NICHT gemeint (modell_key 'keins'): Phone (3a) und (3a) Pro (waagrechte Kameraleiste in der
+  Mitte, Glyph-Leuchtstreifen), Phone (1), (2), (2a), (2a) Plus, CMF Phone, andere Marken.
+Im Titel steht oft nur 'Nothing Phone' oder '3' statt '3a': Entscheide nach Beschreibung und Fotos.
+Ist auch nach den Fotos nicht sicher, dass es ein Phone (3) ist: modell_key 'keins'.
+Kein Zubehör, keine Hülle, kein Karton allein, keine Suchanzeige."""
+ok_defects = []
+no_go = ["an ein fremdes Google-Konto gebunden (FRP-/Kontosperre) oder per Fernsperre gesperrt"]
+check_icloud = false
+title_models = true
+title_skip_models = ["Phone 1", "Phone 2", "Phone 2a", "Phone 3a", "CMF Phone"]
+
+[profile.nothing.max_prices]
+"Phone 3" = 250
 
 [profile.macbook_defekt]
 label = "MacBook ab 2020"
@@ -265,7 +331,7 @@ check_icloud = false
 [profile.ram_ddr4.max_prices]
 "DDR4 8 GB" = 10
 "DDR4 16 GB" = 30
-"DDR4 32 GB" = 60
+"DDR4 32 GB" = 80
 
 
 # ---------------------------------------------------------------------------

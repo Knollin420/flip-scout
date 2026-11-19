@@ -68,6 +68,7 @@ class Search:
     min_price: float | None = None
     active: bool = True
     terms: list[str] = field(default_factory=list)
+    source: str = "vinted"  # "vinted" or "willhaben"
 
 
 class Store:
@@ -79,6 +80,11 @@ class Store:
         self._lock = threading.RLock()
         with self._lock:
             self._db.executescript(SCHEMA)
+            columns = {r[1] for r in self._db.execute("PRAGMA table_info(searches)")}
+            if "source" not in columns:  # databases from before willhaben
+                self._db.execute(
+                    "ALTER TABLE searches ADD COLUMN source TEXT NOT NULL DEFAULT 'vinted'"
+                )
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.commit()
 
@@ -102,12 +108,22 @@ class Store:
         params: dict | None = None,
         max_price: float | None = None,
         min_price: float | None = None,
+        source: str = "vinted",
     ) -> int:
         with self._lock:
             cur = self._exec(
-                "INSERT INTO searches (name, profile, params, max_price, min_price, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (name, profile, json.dumps(params or {}), max_price, min_price, time.time()),
+                "INSERT INTO searches"
+                " (name, profile, params, max_price, min_price, created_at, source)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    name,
+                    profile,
+                    json.dumps(params or {}),
+                    max_price,
+                    min_price,
+                    time.time(),
+                    source,
+                ),
             )
             search_id = int(cur.lastrowid)
             for term in terms or [""]:
@@ -124,6 +140,7 @@ class Store:
             min_price=row["min_price"],
             active=bool(row["active"]),
             terms=self.terms(row["id"]),
+            source=row["source"] if "source" in row.keys() else "vinted",
         )
 
     def get_search(self, search_id: int) -> Search | None:

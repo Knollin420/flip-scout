@@ -84,6 +84,10 @@ def _cut(text: str, limit: int) -> str:
 
 
 def seller_text(item: Item) -> str:
+    if item.source == "willhaben":
+        kind = {True: "Privatperson", False: "Händler"}.get(item.private, "?")
+        where = f" · 📍 {item.location}" if item.location else ""
+        return f"👤 {item.seller_name or 'Verkäufer'} ({kind}){where}"
     if item.seller_feedback is None:
         return "👤 Verkäufer: Bewertungen unbekannt"
     if item.seller_feedback == 0:
@@ -103,7 +107,8 @@ def format_hit(
 ) -> str:
     """Builds the hit message. The link always stays at the end, the middle gets cut."""
     head = [
-        f"{profile.emoji} {search.name}",
+        f"{profile.emoji} {search.name}"
+        + (" · 🟢 willhaben" if item.source == "willhaben" else ""),
         item.title,
         f"💶 {item.price:.2f} € · {item.brand or '-'} · {item.size or '-'}",
         seller_text(item),

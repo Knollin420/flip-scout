@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import random
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .ai import AIChecker, AIResponse, AIRetryLater, AIUnavailable
 from .config import Config, Profile
@@ -21,9 +21,12 @@ from .notify import Notifier, format_hit
 from .rules import (
     Decision,
     decide,
+    find_phrase,
     find_word,
+    fixed_price_word,
     keyword_hit,
     min_price,
+    original_limit,
     price_limit,
     seller_problem,
     size_problem,
@@ -31,6 +34,7 @@ from .rules import (
 )
 from .store import Search, Store
 from .vinted import Item, VintedClient, VintedError
+from .willhaben import WillhabenLoginExpired, message_text
 
 log = logging.getLogger(__name__)
 
@@ -62,10 +66,14 @@ class Pipeline:
         sleep=time.sleep,
         now=time.time,
         rand=random.uniform,
+        willhaben=None,
+        messenger=None,
     ):
         self.cfg = cfg
         self.store = store
         self.vinted = vinted
+        self.willhaben = willhaben  # WillhabenClient or None
+        self.messenger = messenger  # WillhabenMessenger or None (automatic messages)
         self.ai = ai
         self.notifier = notifier
         self.sleep = sleep
@@ -116,8 +124,10 @@ class Pipeline:
         log.info("Pause von %.0f min – merke mir zuerst nur den aktuellen Stand", pause / 60)
         return True
 
-    def search_interval(self, profile: Profile) -> float:
+    def search_interval(self, profile: Profile, search: Search | None = None) -> float:
         """Seconds between two runs of a search with this profile."""
+        if search is not None and search.source == "willhaben":
+            return 60 * self.cfg.settings.willhaben_interval_minutes
         return 60 * (profile.interval_minutes or self.cfg.settings.interval_minutes)
 
     def is_due(self, search: Search, profile: Profile) -> bool:
@@ -125,7 +135,19 @@ class Pipeline:
         if last is None:
             return True
         half_tick = 30 * self.cfg.tick_minutes()  # tolerate the loop's own jitter
-        return self.now() - last >= self.search_interval(profile) - half_tick
+        return self.now() - last >= self.search_interval(profile, search) - half_tick
+
+    def client_for(self, source: str):
+        return self.willhaben if source == "willhaben" else self.vinted
+
+    def source_view(self, profile: Profile, search: Search) -> tuple[Profile, Search]:
+        """willhaben: all price limits raised by willhaben_price_factor (e.g. +20 %)."""
+        factor = self.cfg.settings.willhaben_price_factor
+        if search.source != "willhaben" or factor == 1:
+            return profile, search
+        scaled = {k: round(v * factor, 2) for k, v in profile.max_prices.items()}
+        top = search.max_price * factor if search.max_price is not None else None
+        return replace(profile, max_prices=scaled), replace(search, max_price=top)
 
     def run_once(self, only_due: bool = False) -> RunResult:
         """One pass over the active searches. only_due=True skips searches whose own
@@ -137,7 +159,12 @@ class Pipeline:
             profile = self.cfg.profile(search.profile)
             if only_due and not self.is_due(search, profile):
                 continue
+            client = self.client_for(search.source)
+            if client is None:
+                continue  # willhaben not set up
             self.last_searched[search.id] = self.now()
+            original = (profile, search)
+            profile, search = self.source_view(profile, search)
             price_from = min_price(profile, search, self.cfg.settings.min_price_everywhere)
             candidates: list[Item] = []
             for term in search.terms:
@@ -147,7 +174,7 @@ class Pipeline:
                     self._pause(self.cfg.settings.pause_between_searches)
                 first_request = False
                 try:
-                    items = self.vinted.search(
+                    items = client.search(
                         term,
                         search.params,
                         price_from=price_from,
@@ -192,7 +219,7 @@ class Pipeline:
                     break
                 result.new_items += 1
                 try:
-                    if self.process(search, profile, item):
+                    if self.process(search, profile, item, original):
                         result.hits += 1
                 except RetryItem as exc:
                     log.info("[%s] %s: später erneut (%s)", search.name, item.id, exc)
@@ -209,10 +236,14 @@ class Pipeline:
         log.info("[%s] ✗ %s (%.0f €) – %s", search.name, item.title[:60], item.price, reason)
         return False
 
-    def process(self, search: Search, profile: Profile, item: Item) -> bool:
-        """Checks one new listing. Returns True when a hit was delivered."""
+    def process(
+        self, search: Search, profile: Profile, item: Item, original: tuple | None = None
+    ) -> bool:
+        """Checks one new listing. Returns True when a hit was delivered.
+        original: (profile, search) before willhaben's price factor, for the message."""
         self._count("checked")
         s = self.cfg.settings
+        self._original = original or (profile, search)
 
         # 1. free filters
         age = item.age_minutes(self.now())
@@ -222,6 +253,8 @@ class Pipeline:
             return self._skip(search, item, "reserviert/verkauft")
         if item.promoted:
             return self._skip(search, item, "beworbene (hochgeschobene) Anzeige")
+        if item.source == "willhaben" and s.willhaben_private_only and item.private is False:
+            return self._skip(search, item, "Händleranzeige")
         lowest = min_price(profile, search, s.min_price_everywhere)
         if lowest is not None and item.price < lowest:
             return self._skip(search, item, f"unter Mindestpreis {lowest:g} €")
@@ -231,17 +264,23 @@ class Pipeline:
         word = find_word(item.title, profile.exclude + profile.exclude_desc + s.exclude_everywhere)
         if word:
             return self._skip(search, item, f"Ausschlusswort im Titel: {word!r}")
+        if item.source == "vinted" and (word := find_phrase(item.title, s.vinted_exclude_words)):
+            return self._skip(search, item, f"Zahlung außerhalb von Vinted: {word!r}")
         problem = title_problem(profile, item.title, item.price) or size_problem(profile, item.size)
         if problem:
             return self._skip(search, item, problem)
 
         # 2. + 3. description
         self._pause(s.pause_between_details)
-        self.vinted.load_details(item)
+        self.client_for(item.source).load_details(item)
         self._count("details")
         word = find_word(item.description, profile.exclude_desc + s.exclude_everywhere)
         if word:
             return self._skip(search, item, f"Ausschlusswort in Beschreibung: {word!r}")
+        if item.source == "vinted" and (
+            word := find_phrase(item.description, s.vinted_exclude_words)
+        ):
+            return self._skip(search, item, f"Zahlung außerhalb von Vinted: {word!r}")
 
         problem = seller_problem(item, s.no_feedback_max_price, profile.min_seller_feedback)
         if problem:
@@ -252,6 +291,7 @@ class Pipeline:
             return self._skip(search, item, "keines der Pflichtwörter in Titel/Beschreibung")
         ai_data: dict | None = None
         warnings: list[str] = []
+        sure = True  # for the automatic willhaben message: not when the AI was unsure
 
         if keyword_hit(profile, full_text):
             # 4. keyword hit: always report, AI only writes the briefing
@@ -274,7 +314,14 @@ class Pipeline:
                 decision = decide(profile, search, item.price, ai_data, final=True)
                 if not decision.notify:
                     return self._skip(search, item, f"Text-Check: {decision.reason}")
-                return self._deliver(search, profile, item, ai_data, decision.warnings + warnings)
+                return self._deliver(
+                    search,
+                    profile,
+                    item,
+                    ai_data,
+                    decision.warnings + warnings,
+                    sure=decision.reason == "passt",
+                )
             photos = self._photos(item)
             if photos and self.ai_budget_left():
                 try:
@@ -284,6 +331,7 @@ class Pipeline:
             decision = decide(profile, search, item.price, ai_data, final=True)
             if not decision.notify:
                 return self._skip(search, item, f"Foto-Check: {decision.reason}")
+            sure = decision.reason == "passt"
         elif profile.must_include or profile.any_include:
             return self._skip(search, item, "Stichwörter passen nicht")
         else:
@@ -294,13 +342,15 @@ class Pipeline:
                     return self._skip(search, item, "KI: passt nicht (z.B. Zubehör)")
             decision = Decision(True, "Filter")
 
-        return self._deliver(search, profile, item, ai_data, decision.warnings + warnings)
+        return self._deliver(
+            search, profile, item, ai_data, decision.warnings + warnings, sure=sure
+        )
 
     def _photos(self, item: Item, count: int | None = None) -> list[tuple[bytes, str]]:
         count = self.cfg.ai.max_images if count is None else count
         for url in item.photo_urls[:count]:
             if url not in item.photo_cache:
-                item.photo_cache[url] = self.vinted.download_photo(url)
+                item.photo_cache[url] = self.client_for(item.source).download_photo(url)
         return [p for url in item.photo_urls[:count] if (p := item.photo_cache.get(url))]
 
     def _ai(self, profile: Profile, item: Item, photos: list[tuple[bytes, str]]) -> AIResponse:
@@ -332,7 +382,22 @@ class Pipeline:
         item: Item,
         ai_data: dict | None,
         warnings: list[str],
+        sure: bool = True,
     ) -> bool:
+        limit = None
+        if item.source == "willhaben":
+            o_profile, o_search = self._original
+            limit = original_limit(o_profile, o_search, ai_data, item.title)
+            if limit is not None and item.price > limit:
+                fixed = fixed_price_word(
+                    f"{item.title}\n{item.description}",
+                    self.cfg.settings.willhaben_fixed_price_words,
+                )
+                if fixed:
+                    return self._skip(
+                        search, item, f"über deinem Limit {limit:g} € und Festpreis ({fixed!r})"
+                    )
+                warnings = [*warnings, f"💬 Über deinem Limit von {limit:g} € (willhaben +20 %)"]
         text = format_hit(search, profile, item, ai_data, warnings)
         photos = self._photos(item, count=1)
         buttons = [
@@ -347,4 +412,53 @@ class Pipeline:
         log.info(
             "[%s] ✓ TREFFER %s (%.0f €) %s", search.name, item.title[:60], item.price, item.url
         )
+        if item.source == "willhaben":
+            self._auto_message(search, item, limit, sure)
         return True
+
+    # --- willhaben: automatic message to the seller -------------------------
+
+    def _auto_message(self, search: Search, item: Item, limit: float | None, sure: bool) -> None:
+        s = self.cfg.settings
+        if not (self.messenger and s.willhaben_auto_message):
+            return
+        if self.store.get("wh_auto_message") == "0":  # switched off with /nachrichten aus
+            return
+        reason = ""
+        if item.private is not True:
+            reason = "keine Privatanzeige"
+        elif not sure:
+            reason = "KI war unsicher – selbst prüfen"
+        elif self.store.get(f"wh_msg:{item.id}"):
+            reason = "diese Anzeige wurde schon angeschrieben"
+        elif self.store.stats(self.today).get("wh_messages", 0) >= s.willhaben_max_messages_per_day:
+            reason = f"Tageslimit von {s.willhaben_max_messages_per_day} Nachrichten erreicht"
+        if reason:
+            self.notifier.send_text(f"✉️ Keine automatische Nachricht: {reason}")
+            return
+        text, offer = message_text(
+            s.willhaben_message, s.willhaben_message_offer, item.seller_name, item.price, limit
+        )
+        if not text:
+            return
+        try:
+            self.messenger.send(item.id, item.url, text)
+        except WillhabenLoginExpired:
+            log.warning("willhaben-Login abgelaufen – keine Nachricht an %s", item.id)
+            if self.store.get("wh_login_alert_day") != self.today:
+                self.store.set("wh_login_alert_day", self.today)
+                self.notifier.send_text(
+                    "🔑 willhaben-Login abgelaufen – automatische Nachrichten gehen nicht.\n"
+                    "Bitte neues Cookie eintragen (wie beim ersten Mal)."
+                )
+            return
+        except Exception as exc:
+            log.warning("willhaben-Nachricht an %s fehlgeschlagen: %s", item.id, exc)
+            self.notifier.send_text(f"⚠️ Automatische Nachricht fehlgeschlagen: {exc}"[:300])
+            return
+        self.store.set(f"wh_msg:{item.id}", str(self.now()))
+        self._count("wh_messages")
+        who = item.seller_name or "den Verkäufer"
+        extra = f" – mit Preisvorschlag {limit:g} €" if offer else ""
+        log.info("[%s] ✉️ Nachricht an %s gesendet (%s)%s", search.name, who, item.id, extra)
+        self.notifier.send_text(f"✉️ Nachricht an {who} gesendet{extra}.")

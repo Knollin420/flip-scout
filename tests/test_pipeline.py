@@ -475,3 +475,59 @@ def test_size_tokens():
     p = Profile(key="x", sizes=["44", "45"])
     assert size_problem(p, "44") is None and size_problem(p, "UK 10 / EU 44") is None
     assert size_problem(p, "44.5") and size_problem(p, "44 2/3") and size_problem(p, "4")
+
+
+def test_vinted_payment_outside_is_skipped_for_free(env, store, cfg):
+    cfg.settings.vinted_exclude_words = [
+        "nur überweisung",
+        "bonifico bancario",
+        "whatsapp",
+        "hors vinted",
+    ]
+    ai = FakeAI(ai_answer())
+    pipe, vinted, _, _ = env(ai)
+    store.add_search("S", "iphone", [""])
+    pipe.run_once()
+    items = [
+        make_item(n, title=t)
+        for n, t in [
+            (1, "iPhone 13 – nur Überweisung"),
+            (2, "iPhone 13"),
+            (3, "iPhone 13"),
+            (4, "iPhone 13"),
+            (5, "iPhone 13"),
+        ]
+    ]
+    vinted.results[""] = items
+    vinted.descriptions = {
+        2: "Pagamento con bonifico bancario",
+        3: "Écris-moi, paiement hors Vinted",
+        4: "Bitte nicht über WhatsApp schreiben",
+        5: "Bezahlung über Vinted",
+    }
+    pipe.run_once()
+    assert {c[1] for c in ai.calls} == {4, 5}  # negated WhatsApp and normal listing pass
+
+
+def test_payment_rule_is_vinted_only(env, store, cfg):
+    cfg.settings.vinted_exclude_words = ["nur überweisung"]
+    from flip_scout.rules import find_phrase
+
+    assert find_phrase("Bezahlung nur Überweisung", cfg.settings.vinted_exclude_words)
+    pipe, vinted, _, _ = env(FakeAI(ai_answer()))
+    pipe.willhaben = vinted
+    store.add_search("W", "iphone", [""], source="willhaben")
+    pipe.run_once()
+    item = make_item(1, title="iPhone 13 – nur Überweisung")
+    item.source, item.private = "willhaben", True
+    vinted.results[""] = [item]
+    assert pipe.run_once().hits == 1  # bank transfer is normal on willhaben
+
+
+def test_negation_window():
+    from flip_scout.rules import find_phrase
+
+    words = ["whatsapp", "nicht über vinted"]
+    assert find_phrase("Bitte nicht über WhatsApp schreiben", words) is None
+    assert find_phrase("Zahlung nicht über Vinted, schreib mir auf WhatsApp", words) == "whatsapp"
+    assert find_phrase("Zahlung nicht über Vinted sondern direkt", words) == "nicht über vinted"

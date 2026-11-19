@@ -100,7 +100,25 @@ def build(args: argparse.Namespace):
     ai = AIChecker(cfg.secrets.anthropic_api_key, cfg.ai.model) if cfg.ai_available else None
     if ai is None:
         log.warning("KI aus – nur Stichwort- und Filter-Treffer ohne Briefing.")
-    pipeline = Pipeline(cfg, store, VintedClient(cfg.settings.base_url), ai, notifier)
+    willhaben = messenger = None
+    if cfg.settings.willhaben_enabled:
+        from .willhaben import WillhabenClient, WillhabenMessenger
+
+        s = cfg.settings
+        willhaben = WillhabenClient(s.willhaben_area_id, s.willhaben_rows, s.willhaben_private_only)
+        if s.willhaben_auto_message and cfg.secrets.willhaben_cookie:
+            messenger = WillhabenMessenger(cfg.secrets.willhaben_cookie)
+        elif s.willhaben_auto_message:
+            log.warning("Kein WILLHABEN_COOKIE – keine automatischen willhaben-Nachrichten.")
+    pipeline = Pipeline(
+        cfg,
+        store,
+        VintedClient(cfg.settings.base_url),
+        ai,
+        notifier,
+        willhaben=willhaben,
+        messenger=messenger,
+    )
     monitor = Monitor(cfg, store, notifier)
     return cfg, store, api, notifier, pipeline, monitor
 

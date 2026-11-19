@@ -98,6 +98,37 @@ def title_model(profile: Profile, title: str) -> str | None:
     return kept.pop() if len(kept) == 1 else None
 
 
+def find_phrase(text: str, words: list[str]) -> str | None:
+    """Like find_word, but a phrase right after 'kein/keine/nicht/ohne' does not count."""
+    hay = _norm(text)
+    for word in words:
+        w = _norm(word)
+        for m in re.finditer(re.escape(w), hay):
+            before = hay[max(0, m.start() - 30) : m.start()]
+            # 'nicht über WhatsApp', 'kein Festpreis': up to two words between
+            if not re.search(r"\b(kein|keine|nicht|ohne)(\s+\S+){0,2}\s*$", before):
+                return word
+    return None
+
+
+fixed_price_word = find_phrase  # "Festpreis" etc. (kein Festpreis does not count)
+
+
+def original_limit(profile: Profile, search: Search, ai: dict | None, title: str) -> float | None:
+    """The owner's own price limit for this listing (before willhaben's +20 %)."""
+    if search.max_price is not None:
+        return search.max_price
+    if not profile.max_prices:
+        return None
+    if profile.cpu_check:
+        return max(profile.max_prices.values())
+    key = (ai or {}).get("modell_key")
+    if key in profile.max_prices:
+        return profile.max_prices[key]
+    model = title_model(profile, title) if profile.title_models else None
+    return profile.max_prices.get(model) if model else None
+
+
 def title_problem(profile: Profile, title: str, price: float) -> str | None:
     """Free check before page load and AI: a model clearly named in the title that is
     not wanted or too expensive. None = no decision, the normal checks follow."""

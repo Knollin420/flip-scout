@@ -29,6 +29,46 @@ class Settings:
     seen_retention_days: int = 30
     # Lowest price for every search (listings below are bait offers); None = no limit
     min_price_everywhere: float | None = None
+    # willhaben.at (Vienna by default). Searches with source "willhaben" use these.
+    willhaben_enabled: bool = False
+    willhaben_area_id: int = 900
+    willhaben_interval_minutes: float = 3.0
+    willhaben_rows: int = 30
+    willhaben_private_only: bool = True
+    # Price limits on willhaben are multiplied by this (1.2 = up to 20 % above the limit;
+    # above the real limit the automatic message proposes the real limit as price).
+    willhaben_price_factor: float = 1.0
+    willhaben_auto_message: bool = False
+    willhaben_max_messages_per_day: int = 20
+    willhaben_message: str = ""  # {name}
+    # Above the owner's own limit only report listings whose text does not say the price is
+    # fixed ("Festpreis", "nicht verhandelbar", ...). "kein Festpreis" does not count.
+    willhaben_fixed_price_words: list[str] = field(
+        default_factory=lambda: [
+            "festpreis",
+            "fixpreis",
+            "fix preis",
+            "preis ist fix",
+            "preis fix",
+            "preis fest",
+            "nicht verhandelbar",
+            "unverhandelbar",
+            "keine verhandlung",
+            "nicht verhandeln",
+            "kein handeln",
+            "keine preisverhandlung",
+            "keine preisvorschläge",
+            "keine angebote",
+            "letzter preis",
+            "preis ist final",
+            "endpreis",
+            "kein vb",
+        ]
+    )
+    willhaben_message_offer: str = ""  # {name}, {limit}
+    # Vinted only: payment or contact outside Vinted (no buyer protection) -> skip for free.
+    # Negated phrases ("nicht über WhatsApp") do not count.
+    vinted_exclude_words: list[str] = field(default_factory=list)
     # Words that exclude a listing in every search (title and description, before the AI)
     exclude_everywhere: list[str] = field(default_factory=list)
     # Sellers without any rating: only listings up to this price (None = no limit)
@@ -100,6 +140,7 @@ class Secrets:
     telegram_chat_id: str = ""
     anthropic_api_key: str = ""
     ntfy_topic: str = ""
+    willhaben_cookie: str = ""
 
 
 @dataclass
@@ -193,6 +234,7 @@ def load_config(
         telegram_chat_id=secret("TELEGRAM_CHAT_ID"),
         anthropic_api_key=secret("ANTHROPIC_API_KEY"),
         ntfy_topic=secret("NTFY_TOPIC"),
+        willhaben_cookie=secret("WILLHABEN_COOKIE"),
     )
     data = data_dir or Path(os.environ.get("FLIP_SCOUT_DATA", "data"))
     return Config(

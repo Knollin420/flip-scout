@@ -25,7 +25,8 @@ HELP = (
     "2️⃣ Kopier den Link aus dem Browser und schick ihn mir.\n"
     "3️⃣ Tipp an, welche Art von Suche es ist – fertig.\n\n"
     "/menu – Suchen ansehen, ändern, pausieren, löschen\n"
-    "/status – Zahlen von heute\n\n"
+    "/status – Zahlen von heute\n"
+    "/nachrichten – automatische willhaben-Nachrichten (an/aus)\n\n"
     "Ich melde nur Anzeigen, die NACH dem Anlegen einer Suche neu hochgeladen werden."
 )
 
@@ -50,7 +51,13 @@ CATALOG_NAMES = {
     "3603": "Arbeitsspeicher (RAM)",
     "3661": "Mobiltelefone",
 }
-BRAND_NAMES = {"54661": "Apple", "77600": "Nintendo", "536855": "AMD", "315390": "Google"}
+BRAND_NAMES = {
+    "54661": "Apple",
+    "77600": "Nintendo",
+    "536855": "AMD",
+    "315390": "Google",
+    "43783": "Nothing",
+}
 ID_NAMES = {"catalog_ids": CATALOG_NAMES, "brand_ids": BRAND_NAMES}
 
 
@@ -58,6 +65,9 @@ def filter_text(params: dict) -> str:
     """'catalog_ids=3661, brand_ids=54661' -> 'Kategorie: Mobiltelefone · Marke: Apple'."""
     parts = []
     for key, value in params.items():
+        if key == "path":  # willhaben category
+            parts.append(f"willhaben-Kategorie: {value}")
+            continue
         names = ID_NAMES.get(key, {})
         ids = [v.strip() for v in str(value).split(",") if v.strip()]
         shown = ", ".join(names.get(v, v) for v in ids) if names else f"{len(ids)} gewählt"
@@ -204,6 +214,8 @@ class TelegramBot:
                 return self.send(status_text(self.cfg, self.store))
             if command == "/abbrechen":
                 return self.send("Abgebrochen.")
+            if command == "/nachrichten":
+                return self.send(self.messages_command(text))
             return self.send(HELP)
 
         if self.awaiting:
@@ -318,7 +330,8 @@ class TelegramBot:
         for i, s in enumerate(searches, start=1):
             p = self.cfg.profile(s.profile)
             state = "✅" if s.active else "⏸"
-            lines.append(f"{i}. {p.emoji} {s.name} {state} · {price_text(s, p)}")
+            src = "🟢 " if s.source == "willhaben" else ""
+            lines.append(f"{i}. {src}{p.emoji} {s.name} {state} · {price_text(s, p)}")
             row.append(_btn(f"{i}. {s.name}"[:30], f"s:{s.id}"))
             if len(row) == 2:
                 buttons.append(row)
@@ -359,6 +372,24 @@ class TelegramBot:
         if p.max_prices:
             buttons.insert(1, [_btn("📋 Preisliste", f"pl:{i}")])
         return text, buttons
+
+    def messages_command(self, text: str) -> str:
+        """/nachrichten [an|aus]: automatic willhaben messages on/off and today's count."""
+        arg = (text.split()[1:2] or [""])[0].lower()
+        if arg in ("an", "ein", "on"):
+            self.store.set("wh_auto_message", "1")
+            log.info("Telegram: automatische willhaben-Nachrichten an")
+        elif arg in ("aus", "off"):
+            self.store.set("wh_auto_message", "0")
+            log.info("Telegram: automatische willhaben-Nachrichten aus")
+        s = self.cfg.settings
+        on = s.willhaben_auto_message and self.store.get("wh_auto_message") != "0"
+        sent = self.store.stats(self.cfg.settings.day(time.time())).get("wh_messages", 0)
+        return (
+            f"✉️ Automatische willhaben-Nachrichten: {'AN' if on else 'AUS'}\n"
+            f"Heute gesendet: {sent:.0f} / {s.willhaben_max_messages_per_day}\n\n"
+            "/nachrichten aus – ausschalten · /nachrichten an – einschalten"
+        )
 
     def price_list_view(self, search_id: int) -> tuple[str, list[list[dict]]]:
         s = self.store.get_search(search_id)
