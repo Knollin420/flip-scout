@@ -228,3 +228,49 @@ def test_over_limit_with_fixed_price_is_not_reported(env, store, cfg):
     vinted.results[""] = [over_fixed, under_fixed, over_vb]
     assert pipe.run_once().hits == 2
     assert [a for a, _ in pipe.messenger.sent] == [2, 3]
+
+
+def test_search_word_filters_locally_and_shares_the_request():
+    from flip_scout.willhaben import WillhabenClient
+
+    ads = [
+        {"id": str(n), "attributes": attrs(ADID=n, HEADING=h, PRICE=50, ISPRIVATE=1, BODY_DYN=b)}
+        for n, h, b in [
+            (1, "Handy schwarz 128 GB", "iPhone 13, Display ok"),
+            (2, "Samsung S21", ""),
+            (3, "IPHONE 12", ""),
+        ]
+    ]
+    html = page(
+        {"props": {"pageProps": {"searchResult": {"advertSummaryList": {"advertSummary": ads}}}}}
+    )
+
+    class Resp:
+        status_code, text = 200, html
+
+    class Session:
+        calls = 0
+
+        def get(self, url, timeout=None):
+            Session.calls += 1
+            return Resp()
+
+    c = WillhabenClient(session=Session())
+    params = {"path": "smartphones-handys-2722"}
+    assert [i.id for i in c.search("iphone", params)] == [1, 3]  # brand missing, found by word
+    assert [i.id for i in c.search("samsung", params)] == [2]
+    assert [i.id for i in c.search("", params)] == [1, 2, 3]
+    assert Session.calls == 1  # one request for all three
+
+
+def test_twin_search_skips_items_the_other_already_checked(env, store, cfg):
+    pipe, vinted, notifier, sid, ai = wh_env(env, store, cfg)
+    twin = store.add_search("iPhone ohne Marke", "iphone", ["iphone"], source="willhaben")
+    pipe.run_once()  # both searches remember the stock
+    item = wh_item(7, 50)
+    item.title = "iPhone 12"
+    vinted.results[""] = [item]
+    vinted.results["iphone"] = [item]
+    assert pipe.run_once().hits == 1  # reported once, AI checked once
+    assert [c[1] for c in ai.calls].count(7) == 2  # text + photo check, not 4
+    assert store.is_seen(twin, 7) and store.is_seen(sid, 7)

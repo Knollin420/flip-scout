@@ -248,13 +248,26 @@ class WillhabenClient:
         )
 
     def search(self, term, params, price_from=None, price_to=None, per_page=None):
-        import time
+        """Newest private listings of the category. A search term is NOT sent to willhaben
+        (robots.txt); it filters the category's listings here: title or short text must
+        contain it (finds listings where the seller forgot to pick the brand)."""
         from dataclasses import replace
+
+        words = " ".join((term or "").lower().split())
+        items = [
+            replace(i, photo_cache={})
+            for i in self._category(params)
+            if not words or words in " ".join(f"{i.title} {i.description}".lower().split())
+        ]
+        return items
+
+    def _category(self, params) -> list:
+        import time
 
         url = self.search_url(params)
         cached = self._cache.get(url)
         if cached and time.time() - cached[0] < self.CACHE_SECONDS:
-            return [replace(i, photo_cache={}) for i in cached[1]]  # same category, same run
+            return cached[1]  # same category, same run: no second request
         try:
             resp = self.session.get(url, timeout=self.timeout)
         except Exception as exc:
@@ -266,7 +279,7 @@ class WillhabenClient:
         except ValueError as exc:
             raise WillhabenError("Seitendaten nicht lesbar") from exc
         self._cache[url] = (time.time(), items)
-        return [replace(i, photo_cache={}) for i in items]
+        return items
 
     def load_details(self, item) -> None:
         """Never raises: without the page the short description from the search is used."""

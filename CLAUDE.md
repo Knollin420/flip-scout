@@ -78,6 +78,10 @@ Code, Commits und README auf Englisch.
   `__NEXT_DATA__`. KEINE Suchbegriffe und KEIN Preisfilter in der URL (robots.txt schließt
   `keyword=`/`PRICE_FROM`/`PRICE_TO` aus); Preis/Modell/Größe filtert der Bot selbst.
   „Hochgeschobene“ Anzeigen sind Händler. Takt `willhaben_interval_minutes` (3 Min.).
+- Zu Suchen mit Marken-Kategorie (iPhone, Pixel, Nothing, MacBook, Switch) gibt es eine zweite
+  Suche „… · willhaben ohne Marke“: übergeordnete Kategorie + Suchwort. Das Suchwort wird NICHT
+  an willhaben geschickt, sondern filtert Titel/Kurztext lokal. Was die Zwillings-Suche (gleiches
+  Profil, willhaben) schon gesehen hat, wird übersprungen (`Store.seen_by_sibling`).
 - Anzeigenseite liefert volle Beschreibung, große Fotos und Vornamen des Verkäufers
   (`advertDetails.sellerProfileUserData.name`).
 - Preisgrenzen auf willhaben × `willhaben_price_factor` (1,2). Liegt ein Treffer über dem

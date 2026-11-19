@@ -221,6 +221,17 @@ class Store:
             )
         )
 
+    def seen_by_sibling(self, search: Search, item_id: int) -> bool:
+        """Another search with the same profile and source has already handled this item
+        (e.g. willhaben 'iPhone' by brand and 'iPhone' without brand)."""
+        return bool(
+            self._all(
+                "SELECT 1 FROM seen s JOIN searches x ON x.id = s.search_id"
+                " WHERE s.item_id = ? AND x.id != ? AND x.profile = ? AND x.source = ?",
+                (item_id, search.id, search.profile, search.source),
+            )
+        )
+
     def mark_seen(self, search_id: int, item_id: int) -> None:
         self._exec(
             "INSERT OR IGNORE INTO seen (search_id, item_id, ts) VALUES (?, ?, ?)",

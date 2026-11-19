@@ -205,6 +205,10 @@ class Pipeline:
                 for item in items:
                     if not self.store.is_seen(search.id, item.id):
                         self.store.mark_seen(search.id, item.id)
+                        if search.source == "willhaben" and self.store.seen_by_sibling(
+                            search, item.id
+                        ):
+                            continue  # already checked by the twin search (no double work)
                         candidates.append(item)
 
             for n, item in enumerate(candidates):
