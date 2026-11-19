@@ -169,14 +169,13 @@ check_icloud = false
 # Kostenlose Vorprüfung im Titel (wie beim iPhone); diese Modelle werden nie gemeldet:
 title_models = true
 title_skip_models = ["Pixel 3", "Pixel 4", "Pixel 5", "Pixel 6", "Pixel 7", "Pixel 8",
-                     "Pixel 9a", "Pixel 10a", "Pixel 11"]
+                     "Pixel 9a", "Pixel 10a", "Pixel 11", "Pixel 9 Pro Fold"]
 
 [profile.pixel.max_prices]
 # Varianten (Pro XL, Pro Fold) wie das nächste genannte Modell
 "Pixel 9" = 250
-"Pixel 9 Pro" = 250
-"Pixel 9 Pro XL" = 250
-"Pixel 9 Pro Fold" = 250
+"Pixel 9 Pro" = 300
+"Pixel 9 Pro XL" = 300
 "Pixel 10" = 350
 "Pixel 10 Pro" = 350
 "Pixel 10 Pro XL" = 350
