@@ -399,13 +399,13 @@ class Pipeline:
                     )
                 warnings = [*warnings, f"💬 Über deinem Limit von {limit:g} € (willhaben +20 %)"]
         text = format_hit(search, profile, item, ai_data, warnings)
-        photos = self._photos(item, count=1)
-        buttons = [
-            [{"text": "🛒 Zur Anzeige (in der App kaufen)", "url": item.url}],
-            [{"text": "⏸ Suche pausieren", "callback_data": f"hp:{search.id}"}],
-        ]
+        photos = self._photos(item, count=3)
+        # The link to the listing is at the end of the text; only the pause button here.
+        buttons = [[{"text": "⏸ Suche pausieren", "callback_data": f"hp:{search.id}"}]]
         first_url = item.photo_urls[0] if item.photo_urls else ""
-        if not self.notifier.send_hit(text, photos[0] if photos else None, first_url, buttons):
+        if not self.notifier.send_hit(
+            text, photos[0] if photos else None, first_url, buttons, photos=photos
+        ):
             raise RetryItem("Telegram nicht erreichbar")
         self._count("hits")
         self.store.add_hit(search.id, item.id, item.title, item.price, item.url, text)

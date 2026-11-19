@@ -34,10 +34,11 @@ class TelegramAPI:
         params: dict | None = None,
         photo: tuple[bytes, str] | None = None,
         timeout: float | None = None,
+        files: dict | None = None,
     ):
         params = {k: v for k, v in (params or {}).items() if v is not None}
-        if photo:
-            body, content_type = _multipart(params, photo)
+        if photo or files:
+            body, content_type = _multipart(params, photo, files)
         else:
             body, content_type = json.dumps(params).encode(), "application/json"
         req = urllib.request.Request(
@@ -58,7 +59,13 @@ class TelegramAPI:
         return data.get("result")
 
 
-def _multipart(params: dict, photo: tuple[bytes, str]) -> tuple[bytes, str]:
+def _multipart(
+    params: dict, photo: tuple[bytes, str] | None = None, files: dict | None = None
+) -> tuple[bytes, str]:
+    """Form upload: one 'photo', or several named files (for sendMediaGroup)."""
+    files = dict(files or {})
+    if photo:
+        files["photo"] = photo
     boundary = uuid.uuid4().hex
     parts: list[bytes] = []
     for key, value in params.items():
@@ -68,13 +75,13 @@ def _multipart(params: dict, photo: tuple[bytes, str]) -> tuple[bytes, str]:
             f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n'
             f"{value}\r\n".encode()
         )
-    data, media_type = photo
-    ext = media_type.split("/")[-1]
-    parts.append(
-        f'--{boundary}\r\nContent-Disposition: form-data; name="photo"; '
-        f'filename="photo.{ext}"\r\nContent-Type: {media_type}\r\n\r\n'.encode()
-    )
-    parts.append(data + b"\r\n")
+    for name, (data, media_type) in files.items():
+        ext = media_type.split("/")[-1]
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"; '
+            f'filename="{name}.{ext}"\r\nContent-Type: {media_type}\r\n\r\n'.encode()
+        )
+        parts.append(data + b"\r\n")
     parts.append(f"--{boundary}--\r\n".encode())
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
@@ -106,9 +113,10 @@ def format_hit(
     limit: int = CAPTION_LIMIT,
 ) -> str:
     """Builds the hit message. The link always stays at the end, the middle gets cut."""
+    source = "🟢 WILLHABEN" if item.source == "willhaben" else "🔵 VINTED"
     head = [
-        f"{profile.emoji} {search.name}"
-        + (" · 🟢 willhaben" if item.source == "willhaben" else ""),
+        source,
+        f"{profile.emoji} {search.name}",
         item.title,
         f"💶 {item.price:.2f} € · {item.brand or '-'} · {item.size or '-'}",
         seller_text(item),
@@ -193,15 +201,49 @@ class Notifier:
         photo: tuple[bytes, str] | None,
         photo_url: str,
         buttons: list[list[dict]] | None = None,
+        photos: list[tuple[bytes, str]] | None = None,
     ) -> bool:
-        """Photo with caption; if the photo fails: text only. True = delivered."""
+        """Album (2-3 photos, buttons in a short message below) or one photo with caption;
+        if photos fail: text only. True = delivered."""
         if not self.api:
             self._ntfy(text)
             return True
         markup = {"inline_keyboard": buttons} if buttons else None
         caption = _cut(text, CAPTION_LIMIT)
 
+        def send_album() -> bool:
+            album = (photos or [])[:3]
+            if len(album) < 2:
+                return False
+            media = [
+                {
+                    "type": "photo",
+                    "media": f"attach://p{i}",
+                    **({"caption": caption} if i == 0 else {}),
+                }
+                for i in range(len(album))
+            ]
+            try:
+                self.api.call(
+                    "sendMediaGroup",
+                    {"chat_id": self.chat_id, "media": media},
+                    files={f"p{i}": p for i, p in enumerate(album)},
+                    timeout=90,
+                )
+            except TelegramError as exc:
+                log.info("Album nicht gesendet (%s) – sende ein Foto", exc)
+                return False
+            if markup:
+                head = " · ".join(text.splitlines()[:2])
+                self.api.call(
+                    "sendMessage",
+                    {"chat_id": self.chat_id, "text": f"👆 {head}"[:200], "reply_markup": markup},
+                )
+            return True
+
         def send() -> None:
+            if send_album():
+                return
             params = {"chat_id": self.chat_id, "caption": caption, "reply_markup": markup}
             try:
                 if photo:

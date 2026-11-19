@@ -439,17 +439,19 @@ def test_own_min_price_higher_than_everywhere_wins(store, cfg):
     assert min_price(p, Search(1, "S"), None) is None
 
 
-def test_hit_has_big_button_to_the_listing(env, store):
+def test_hit_has_only_pause_button_and_link_in_text(env, store):
     pipe, vinted, _, notifier = env(FakeAI(ai_answer()))
     store.add_search("S", "iphone", [""])
     pipe.run_once()
     vinted.results[""] = [make_item(42, price=150)]
     sent = []
-    notifier.send_hit = lambda text, photo, url, buttons=None: sent.append(buttons) or True
+    notifier.send_hit = lambda text, photo, url, buttons=None, photos=None: (
+        sent.append((text, buttons)) or True
+    )
     assert pipe.run_once().hits == 1
-    first = sent[0][0][0]
-    assert first["text"].startswith("🛒")
-    assert first["url"] == "https://www.vinted.at/items/42"  # the app opens listings directly
+    text, buttons = sent[0]
+    assert buttons == [[{"text": "⏸ Suche pausieren", "callback_data": "hp:1"}]]
+    assert text.endswith("https://www.vinted.at/items/42")
 
 
 def test_size_filter_and_text_only_check(env, store, cfg):

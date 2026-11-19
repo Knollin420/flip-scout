@@ -89,7 +89,7 @@ class FakeNotifier:
         self.photos: list = []
         self.ok = True
 
-    def send_hit(self, text, photo, photo_url, buttons=None):
+    def send_hit(self, text, photo, photo_url, buttons=None, photos=None):
         if self.ok:
             self.hits.append(text)
             self.photos.append(photo)

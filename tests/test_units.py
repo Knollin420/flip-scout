@@ -430,3 +430,44 @@ def test_cpu_unknown():
     assert cpu_problem("", 0) == UNKNOWN
     assert cpu_problem("Intel Core i5", 0) == UNKNOWN
     assert cpu_problem("Intel Core i5 8th Gen", 0, mobile_suffix_required=True) == UNKNOWN
+
+
+def test_hit_as_album_with_buttons_below():
+    from flip_scout.notify import Notifier
+
+    class API:
+        def __init__(self):
+            self.calls = []
+
+        def call(self, method, params=None, photo=None, timeout=None, files=None):
+            self.calls.append((method, params, sorted(files) if files else None))
+
+    api = API()
+    n = Notifier(api, "1", "")
+    photos = [
+        (b"a", "image/jpeg"),
+        (b"b", "image/jpeg"),
+        (b"c", "image/webp"),
+        (b"d", "image/jpeg"),
+    ]
+    buttons = [[{"text": "x", "url": "https://v"}]]
+    assert n.send_hit("🔵 VINTED\n📱 iPhone\nText", photos[0], "", buttons, photos=photos)
+    (m1, p1, f1), (m2, p2, _) = api.calls
+    assert m1 == "sendMediaGroup" and f1 == ["p0", "p1", "p2"]  # max. 3 photos
+    assert p1["media"][0]["caption"].startswith("🔵 VINTED") and "caption" not in p1["media"][1]
+    assert m2 == "sendMessage" and p2["reply_markup"] == {"inline_keyboard": buttons}
+
+
+def test_single_photo_keeps_buttons_on_photo():
+    from flip_scout.notify import Notifier
+
+    calls = []
+
+    class API:
+        def call(self, method, params=None, photo=None, timeout=None, files=None):
+            calls.append(method)
+
+    assert Notifier(API(), "1", "").send_hit(
+        "t", (b"a", "image/jpeg"), "", None, photos=[(b"a", "image/jpeg")]
+    )
+    assert calls == ["sendPhoto"]
