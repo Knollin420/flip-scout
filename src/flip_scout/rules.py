@@ -58,6 +58,18 @@ def seller_problem(item, no_feedback_max_price: float | None, min_feedback: int 
     return None
 
 
+_SIZE_TOKEN = re.compile(r"\d+(?:[.,]\d+)?(?:\s+\d/\d)?")
+
+
+def size_problem(profile: Profile, size: str) -> str | None:
+    """Free size check: '44', 'EU 44', 'UK 10 / EU 44' match 44; '44.5' or '44 2/3' do not."""
+    if not profile.sizes or not (size or "").strip():
+        return None
+    tokens = {t.replace(",", ".") for t in _SIZE_TOKEN.findall(size)}
+    wanted = {s.replace(",", ".") for s in profile.sizes}
+    return None if tokens & wanted else f"Größe {size} (gesucht: {', '.join(profile.sizes)})"
+
+
 def _model_text(text: str) -> str:
     """'Apple iPhone13 Pro-Max!' -> ' apple iphone 13 pro max ' (spaces around tokens)."""
     text = re.sub(r"[^a-z0-9]+", " ", (text or "").lower())

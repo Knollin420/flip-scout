@@ -450,3 +450,28 @@ def test_hit_has_big_button_to_the_listing(env, store):
     first = sent[0][0][0]
     assert first["text"].startswith("🛒")
     assert first["url"] == "https://www.vinted.at/items/42"  # the app opens listings directly
+
+
+def test_size_filter_and_text_only_check(env, store, cfg):
+    p = cfg.profiles["iphone"]
+    p.sizes, p.photo_check, p.max_prices, p.check_icloud = ["44", "45"], False, {}, False
+    ai = FakeAI(ai_answer(modell_key="keins"))
+    pipe, vinted, _, notifier = env(ai)
+    store.add_search("Osiris", "iphone", ["osiris d3"])
+    pipe.run_once()
+    items = [make_item(n, title="Osiris D3") for n in range(1, 6)]
+    for item, size in zip(items, ["44", "45", "44.5", "42", ""], strict=True):
+        item.size = size
+    vinted.results["osiris d3"] = items
+    assert pipe.run_once().hits == 3  # 44, 45 and the one without size
+    assert {c[1] for c in ai.calls} == {1, 2, 5}
+    assert all(c[2] == 0 for c in ai.calls)  # never with photos
+
+
+def test_size_tokens():
+    from flip_scout.config import Profile
+    from flip_scout.rules import size_problem
+
+    p = Profile(key="x", sizes=["44", "45"])
+    assert size_problem(p, "44") is None and size_problem(p, "UK 10 / EU 44") is None
+    assert size_problem(p, "44.5") and size_problem(p, "44 2/3") and size_problem(p, "4")

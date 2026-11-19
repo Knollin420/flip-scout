@@ -218,6 +218,26 @@ title_models = true
 "RX 6800" = 200
 "RX 6800 XT" = 330
 
+[profile.osiris]
+label = "Osiris D3"
+emoji = "👟"
+sizes = ["44", "45"]          # kostenlos: andere Größen gar nicht erst ansehen
+photo_check = false           # nur Titel und Beschreibung, keine Bildprüfung
+require_any = ["osiris"]
+exclude = ["nur karton", "leerer karton", "boîte seule", "boite seule", "schnürsenkel", "lacets", "shoelaces"]
+exclude_desc = ["ich suche", "nur tausch", "je cherche", "cerco"]
+ai_check = """Echte Schuhe Osiris D3 (alle D3-Varianten: D3 2001, D3 OG, D3 Anniversary usw.) als
+komplettes Paar, Größe EU 44 oder 45. Zustand egal. Prüfe Titel UND Beschreibung genau: 'Osiris'
+oder 'D3' wird oft nur zum Anlocken genannt. passt = 'nein', wenn es ein anderer Schuh ist
+('Style wie Osiris D3', 'ähnlich D3', 'D3-Vibe', 'kein Osiris', Stichwort-Listen/Hashtags mit vielen
+Marken), ein anderes Osiris-Modell (z.B. Osiris Clone, NYC 83, Peril), eine Fälschung/Replica/
+'inspired', nur ein Schuh, nur Karton oder Schnürsenkel, oder eine Suchanzeige. passt = 'unklar',
+wenn aus dem Text nicht sicher hervorgeht, dass es echte Osiris D3 sind. Ist im Text eine andere
+Größe als 44 oder 45 genannt: passt = 'nein'."""
+ok_defects = []
+no_go = []
+check_icloud = false
+
 [profile.ram_ddr4]
 label = "DDR4-RAM"
 emoji = "🧠"

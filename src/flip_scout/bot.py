@@ -41,6 +41,8 @@ FILTER_NAMES = {
 # Names for known Vinted IDs (vinted.at). Unknown IDs are shown as numbers.
 CATALOG_NAMES = {
     "3025": "Spielkonsolen",
+    "1242": "Sneaker",
+    "2632": "Sneaker (Damen)",
     "3580": "Laptops",
     "3581": "Desktop-PCs",
     "3599": "Prozessoren",

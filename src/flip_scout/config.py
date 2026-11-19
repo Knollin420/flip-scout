@@ -79,6 +79,11 @@ class Profile:
     title_skip_models: list[str] = field(default_factory=list)
     # Minimum number of seller ratings, regardless of price (unknown ratings never block)
     min_seller_feedback: int = 0
+    # Only these sizes (as Vinted shows them, e.g. "44"); free check before the item page.
+    # Listings without a size pass. Empty = any size.
+    sizes: list[str] = field(default_factory=list)
+    # False: the AI decides from title and description only, no photo check
+    photo_check: bool = True
     # CPU check by fixed rules (cpu.py): "laptop" or "minipc" (mobile suffix required); "" = off
     cpu_check: str = ""
     # Own search interval for searches with this profile (None = settings.interval_minutes)

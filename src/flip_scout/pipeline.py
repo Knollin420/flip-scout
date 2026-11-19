@@ -26,6 +26,7 @@ from .rules import (
     min_price,
     price_limit,
     seller_problem,
+    size_problem,
     title_problem,
 )
 from .store import Search, Store
@@ -230,7 +231,7 @@ class Pipeline:
         word = find_word(item.title, profile.exclude + profile.exclude_desc + s.exclude_everywhere)
         if word:
             return self._skip(search, item, f"Ausschlusswort im Titel: {word!r}")
-        problem = title_problem(profile, item.title, item.price)
+        problem = title_problem(profile, item.title, item.price) or size_problem(profile, item.size)
         if problem:
             return self._skip(search, item, problem)
 
@@ -269,6 +270,11 @@ class Pipeline:
             if not decision.notify:
                 return self._skip(search, item, f"Text-Check: {decision.reason}")
             ai_data = text_check.data
+            if not profile.photo_check:
+                decision = decide(profile, search, item.price, ai_data, final=True)
+                if not decision.notify:
+                    return self._skip(search, item, f"Text-Check: {decision.reason}")
+                return self._deliver(search, profile, item, ai_data, decision.warnings + warnings)
             photos = self._photos(item)
             if photos and self.ai_budget_left():
                 try:
