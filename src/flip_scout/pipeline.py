@@ -330,10 +330,8 @@ class Pipeline:
         text = format_hit(search, profile, item, ai_data, warnings)
         photos = self._photos(item, count=1)
         buttons = [
-            [
-                {"text": "🔗 Öffnen", "url": item.url},
-                {"text": "⏸ Suche pausieren", "callback_data": f"hp:{search.id}"},
-            ]
+            [{"text": "🛒 Zur Anzeige (in der App kaufen)", "url": item.url}],
+            [{"text": "⏸ Suche pausieren", "callback_data": f"hp:{search.id}"}],
         ]
         first_url = item.photo_urls[0] if item.photo_urls else ""
         if not self.notifier.send_hit(text, photos[0] if photos else None, first_url, buttons):

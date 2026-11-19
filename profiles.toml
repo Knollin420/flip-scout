@@ -109,7 +109,7 @@ title_skip_models = ["iPhone 3G", "iPhone 4", "iPhone 5", "iPhone 6", "iPhone 7"
 "iPhone 17" = 400
 "iPhone 17 Pro" = 400
 "iPhone 17 Pro Max" = 400
-"iPhone Air" = 400
+"iPhone Air" = 450
 
 [profile.pixel]
 label = "Google Pixel"
