@@ -203,7 +203,7 @@ class Notifier:
         buttons: list[list[dict]] | None = None,
         photos: list[tuple[bytes, str]] | None = None,
     ) -> bool:
-        """Album (2-3 photos, buttons in a short message below) or one photo with caption;
+        """Album (2-3 photos, no buttons: one notification) or one photo with caption and buttons;
         if photos fail: text only. True = delivered."""
         if not self.api:
             self._ntfy(text)
@@ -233,12 +233,7 @@ class Notifier:
             except TelegramError as exc:
                 log.info("Album nicht gesendet (%s) – sende ein Foto", exc)
                 return False
-            if markup:
-                head = " · ".join(text.splitlines()[:2])
-                self.api.call(
-                    "sendMessage",
-                    {"chat_id": self.chat_id, "text": f"👆 {head}"[:200], "reply_markup": markup},
-                )
+            # Albums cannot carry buttons; no extra message (one notification per hit).
             return True
 
         def send() -> None:
