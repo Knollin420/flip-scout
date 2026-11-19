@@ -177,5 +177,6 @@ def env(cfg, store):
 
 
 @pytest.fixture
-def example_config() -> Config:
-    return load_config(ROOT / "profiles.example.toml", env_path=None)
+def repo_config() -> Config:
+    """The real profiles.toml from the repository."""
+    return load_config(ROOT / "profiles.toml", env_path=None)

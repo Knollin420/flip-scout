@@ -1,7 +1,0 @@
-.git
-.venv
-data
-.env
-profiles.toml
-tests
-deploy

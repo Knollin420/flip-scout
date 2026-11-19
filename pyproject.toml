@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flip-scout"
-version = "0.1.0"
-description = "Telegram alert bot for new Vinted listings with AI-powered condition analysis"
+version = "0.2.0"
+description = "Telegram deal alerts for Vinted and willhaben with AI checks of text and photos"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"

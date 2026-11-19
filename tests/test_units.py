@@ -443,7 +443,7 @@ def test_hit_as_album_is_one_message():
             self.calls.append((method, params, sorted(files) if files else None))
 
     api = API()
-    n = Notifier(api, "1", "")
+    n = Notifier(api, "1")
     photos = [
         (b"a", "image/jpeg"),
         (b"b", "image/jpeg"),
@@ -466,7 +466,7 @@ def test_single_photo_keeps_buttons_on_photo():
         def call(self, method, params=None, photo=None, timeout=None, files=None):
             calls.append(method)
 
-    assert Notifier(API(), "1", "").send_hit(
+    assert Notifier(API(), "1").send_hit(
         "t", (b"a", "image/jpeg"), "", None, photos=[(b"a", "image/jpeg")]
     )
     assert calls == ["sendPhoto"]

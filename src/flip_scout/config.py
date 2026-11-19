@@ -139,7 +139,6 @@ class Secrets:
     telegram_token: str = ""
     telegram_chat_id: str = ""
     anthropic_api_key: str = ""
-    ntfy_topic: str = ""
     willhaben_cookie: str = ""
 
 
@@ -148,7 +147,6 @@ class Config:
     settings: Settings = field(default_factory=Settings)
     ai: AISettings = field(default_factory=AISettings)
     profiles: dict[str, Profile] = field(default_factory=dict)
-    seed_searches: list[dict] = field(default_factory=list)
     secrets: Secrets = field(default_factory=Secrets)
     data_dir: Path = Path("data")
 
@@ -217,13 +215,6 @@ def load_config(
             )
     profiles.setdefault("standard", Profile(key="standard", label="Normal"))
 
-    seeds = list(raw.get("search", []))
-    for s in seeds:
-        if s.get("profile", "standard") not in profiles:
-            raise ValueError(
-                f"Suche {s.get('name')!r}: Profil {s.get('profile')!r} existiert nicht."
-            )
-
     env = parse_env_file(env_path) if env_path else {}
 
     def secret(name: str) -> str:
@@ -233,7 +224,6 @@ def load_config(
         telegram_token=secret("TELEGRAM_TOKEN"),
         telegram_chat_id=secret("TELEGRAM_CHAT_ID"),
         anthropic_api_key=secret("ANTHROPIC_API_KEY"),
-        ntfy_topic=secret("NTFY_TOPIC"),
         willhaben_cookie=secret("WILLHABEN_COOKIE"),
     )
     data = data_dir or Path(os.environ.get("FLIP_SCOUT_DATA", "data"))
@@ -241,7 +231,6 @@ def load_config(
         settings=settings,
         ai=ai,
         profiles=profiles,
-        seed_searches=seeds,
         secrets=secrets,
         data_dir=data,
     )

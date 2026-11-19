@@ -9,19 +9,36 @@ weder `/root` noch `/home` sehen. Andere Programme auf dem Server bleiben unber�
 apt update && apt install -y python3-venv git
 cd /opt && git clone https://github.com/Knollin420/flip-scout.git && cd flip-scout
 python3 -m venv .venv && .venv/bin/pip install -e .
-cp profiles.example.toml profiles.toml
 .venv/bin/python -m flip_scout --diagnose     # muss überall ✅ zeigen
 ```
 
-## 2. Einstellungen vom PC übernehmen
+`profiles.toml` (Profile und Preislisten) liegt schon im Repository.
 
-**Auf dem PC** in PowerShell (nicht auf dem Server). Damit kommen `.env`, `profiles.toml`
-und die Datenbank mit deinen Suchen auf den Server:
+## 2. Geheimnisse eintragen (`.env`)
 
-```powershell
-scp $HOME\flip-scout\.env $HOME\flip-scout\profiles.toml root@<server-ip>:/opt/flip-scout/
-scp -r $HOME\flip-scout\data root@<server-ip>:/opt/flip-scout/
+```bash
+cp .env.example .env
 ```
+
+Telegram-Token, Chat-ID und Anthropic-Key eintragen, ohne sie irgendwo anzuzeigen. Ohne
+Editor geht das z. B. so (die Eingabe ist unsichtbar):
+
+```bash
+printf "Wert einfügen, dann Enter: "; stty -echo -icanon; IFS= read -r V; stty echo icanon; \
+  sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$V|" /opt/flip-scout/.env; echo; unset V
+```
+
+**Optional – automatische willhaben-Nachrichten:** Im Browser bei willhaben anmelden
+(„Angemeldet bleiben“), F12 → Network → F5 → ersten Eintrag anklicken → Request Headers →
+`cookie` → „Copy value“. Dann auf dem Server:
+
+```bash
+printf "Cookie einfügen, dann Enter: "; stty -echo -icanon; IFS= read -r C; stty echo icanon; \
+  printf 'WILLHABEN_COOKIE="%s"\n' "$C" >> /opt/flip-scout/.env; echo; unset C
+```
+
+Läuft das Cookie ab, meldet der Bot „🔑 willhaben-Login abgelaufen“; dann die Schritte
+wiederholen (vorher die alte Zeile `WILLHABEN_COOKIE=` aus `.env` entfernen).
 
 ## 3. Eigenen Benutzer anlegen und Rechte setzen (Server)
 
@@ -35,7 +52,7 @@ sudo -u flipscout /opt/flip-scout/.venv/bin/python -m flip_scout --test-notify
 
 ## 4. Als Dienst starten
 
-Vorher den Bot auf dem PC beenden (Fenster schließen), sonst kommt alles doppelt.
+Der Bot darf mit demselben Telegram-Token nur an einer Stelle laufen.
 
 ```bash
 cp /opt/flip-scout/deploy/server/flip-scout.service /etc/systemd/system/
@@ -55,6 +72,6 @@ und nach Abstürzen automatisch.
 | Status | `systemctl status flip-scout` |
 | Neu starten (nach Änderung an `.env` / `profiles.toml`) | `systemctl restart flip-scout` |
 | Stoppen | `systemctl stop flip-scout` |
-| Einstellungen bearbeiten | `nano /opt/flip-scout/profiles.toml`, danach neu starten |
+| Einstellungen ändern | `profiles.toml` anpassen (liegt im Repository), danach neu starten |
 | Update von GitHub | `sudo -u flipscout git -C /opt/flip-scout pull && sudo -u flipscout /opt/flip-scout/.venv/bin/pip install -q -e /opt/flip-scout && systemctl restart flip-scout` |
 | Absturzmeldungen | `journalctl -u flip-scout -n 50` |

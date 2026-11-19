@@ -1,4 +1,4 @@
-"""Telegram (and optional ntfy.sh) notifications. Uses only the standard library."""
+"""Telegram notifications. Uses only the standard library."""
 
 from __future__ import annotations
 
@@ -156,13 +156,11 @@ class Notifier:
         self,
         api: TelegramAPI | None,
         chat_id: str,
-        ntfy_topic: str = "",
         retries: int = 3,
         retry_wait: float = 5.0,
     ):
         self.api = api
         self.chat_id = chat_id
-        self.ntfy_topic = ntfy_topic
         self.retries = retries
         self.retry_wait = retry_wait
 
@@ -192,7 +190,6 @@ class Notifier:
                     },
                 )
             )
-        self._ntfy(text)
         return ok
 
     def send_hit(
@@ -206,7 +203,6 @@ class Notifier:
         """Album (2-3 photos, no buttons: one notification) or one photo with caption and buttons;
         if photos fail: text only. True = delivered."""
         if not self.api:
-            self._ntfy(text)
             return True
         markup = {"inline_keyboard": buttons} if buttons else None
         caption = _cut(text, CAPTION_LIMIT)
@@ -254,16 +250,4 @@ class Notifier:
                 )
 
         ok = self._with_retry(send)
-        self._ntfy(text)
         return ok
-
-    def _ntfy(self, text: str) -> None:
-        if not self.ntfy_topic:
-            return
-        try:
-            req = urllib.request.Request(
-                f"https://ntfy.sh/{self.ntfy_topic}", data=text.encode("utf-8")
-            )
-            urllib.request.urlopen(req, timeout=15).close()
-        except Exception as exc:
-            log.info("ntfy fehlgeschlagen: %s", exc)

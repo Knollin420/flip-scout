@@ -18,9 +18,8 @@ import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from .config import Config, load_config
+from .config import load_config
 from .store import Store
-from .urlimport import parse_vinted_url
 
 log = logging.getLogger("flip_scout")
 
@@ -36,35 +35,6 @@ def seconds_until_next_run(
     tick = 60 * (tick_minutes or settings.interval_minutes)
     jitter = min(settings.jitter_seconds, 0.15 * tick)
     return max(MIN_GAP_SECONDS, tick + rand(-jitter, jitter) - elapsed)
-
-
-def import_seed_searches(cfg: Config, store: Store) -> None:
-    """[[search]] entries from profiles.toml are imported once (deleted ones stay deleted)."""
-    for seed in cfg.seed_searches:
-        name = seed["name"]
-        marker = f"seed_imported:{name.lower()}"
-        if store.get(marker) or store.find_search_by_name(name):
-            continue
-        terms = [t.lower() for t in seed.get("terms", [])]
-        params: dict[str, str] = dict(seed.get("params", {}))
-        max_price, min_price = seed.get("max_price"), seed.get("min_price")
-        if seed.get("url"):
-            imp = parse_vinted_url(seed["url"])
-            params = {**imp.params, **params}
-            if imp.term and imp.term.lower() not in terms:
-                terms.insert(0, imp.term.lower())
-            max_price = max_price if max_price is not None else imp.price_to
-            min_price = min_price if min_price is not None else imp.price_from
-        store.add_search(
-            name,
-            profile=seed.get("profile", "standard"),
-            terms=terms or [""],
-            params=params,
-            max_price=max_price,
-            min_price=min_price,
-        )
-        store.set(marker, "1")
-        log.info("Start-Suche übernommen: %s", name)
 
 
 def acquire_instance_lock(port: int = 47913) -> socket.socket | None:
@@ -91,12 +61,11 @@ def build(args: argparse.Namespace):
 
     cfg = load_config(Path(args.config), Path(args.env), Path(args.data) if args.data else None)
     store = Store(cfg.data_dir / "flip-scout.db")
-    import_seed_searches(cfg, store)
 
     api = TelegramAPI(cfg.secrets.telegram_token) if cfg.secrets.telegram_token else None
     if api is None:
         log.warning("Kein TELEGRAM_TOKEN – Treffer erscheinen nur im Log.")
-    notifier = Notifier(api, cfg.secrets.telegram_chat_id, cfg.secrets.ntfy_topic)
+    notifier = Notifier(api, cfg.secrets.telegram_chat_id)
     ai = AIChecker(cfg.secrets.anthropic_api_key, cfg.ai.model) if cfg.ai_available else None
     if ai is None:
         log.warning("KI aus – nur Stichwort- und Filter-Treffer ohne Briefing.")
@@ -152,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         handlers=handlers,
     )
     if not Path(args.config).exists():
-        log.error("%s fehlt – kopiere profiles.example.toml nach %s", args.config, args.config)
+        log.error("%s fehlt (profiles.toml liegt im Repository)", args.config)
         return 2
 
     cfg, store, api, notifier, pipeline, monitor = build(args)

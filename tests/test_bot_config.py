@@ -1,6 +1,6 @@
 import time
 
-from flip_scout.__main__ import acquire_instance_lock, import_seed_searches
+from flip_scout.__main__ import acquire_instance_lock
 from flip_scout.bot import TelegramBot, parse_price
 from flip_scout.monitor import Monitor, status_text
 from flip_scout.pipeline import RunResult
@@ -79,16 +79,13 @@ def test_parse_price():
     assert parse_price("billig") is None
 
 
-def test_example_config_loads_and_seeds(example_config, store):
-    assert {"standard", "iphone_defekt", "macbook_defekt"} <= set(example_config.profiles)
-    assert example_config.profiles["iphone_defekt"].max_prices["iPhone 13 Pro"] > 0
-    import_seed_searches(example_config, store)
-    names = [s.name for s in store.list_searches()]
-    assert names == ["iPhone defekt", "MacBook defekt", "Switch OLED"]
-    # deleted seed searches are not re-imported on restart
-    store.delete_search(store.list_searches()[0].id)
-    import_seed_searches(example_config, store)
-    assert len(store.list_searches()) == 2
+def test_repo_profiles_load(repo_config):
+    p = repo_config.profiles
+    assert {"standard", "iphone_defekt", "macbook_defekt", "laptop", "minipc"} <= set(p)
+    assert p["iphone_defekt"].max_prices["iPhone 13 Pro"] > 0
+    assert p["laptop"].cpu_check == "laptop" and p["minipc"].cpu_check == "minipc"
+    assert repo_config.settings.interval_minutes >= 3
+    assert repo_config.settings.willhaben_message and repo_config.settings.willhaben_message_offer
 
 
 def test_monitor_alarm_recovery_and_heartbeat(cfg, store):
