@@ -199,7 +199,9 @@ def decide(profile: Profile, search: Search, price: float, ai: dict, final: bool
                 return Decision(False, f"{key}: {price:.0f} € > {limit:.0f} €")
         elif passt == "unklar" and not final:
             pass  # model not recognisable from the text alone: the photo check decides
-        elif search.max_price is None:
+        elif search.max_price is None or profile.title_models:
+            # profiles with a fixed model list never report other models, even when the
+            # search has its own (lower) price cap
             return Decision(False, f"Modell nicht in Preistabelle ({ai.get('modell') or '?'})")
         else:
             warnings.append(f"ℹ️ Modell nicht in Preistabelle – nur Grenze {search.max_price:.0f} €")

@@ -533,3 +533,16 @@ def test_negation_window():
     assert find_phrase("Bitte nicht über WhatsApp schreiben", words) is None
     assert find_phrase("Zahlung nicht über Vinted, schreib mir auf WhatsApp", words) == "whatsapp"
     assert find_phrase("Zahlung nicht über Vinted sondern direkt", words) == "nicht über vinted"
+
+
+def test_search_cap_does_not_open_fixed_model_lists(store):
+    from flip_scout.config import Profile
+    from flip_scout.rules import decide
+    from flip_scout.store import Search
+
+    p = Profile(key="i", max_prices={"iPhone 13": 80}, title_models=True)
+    capped = Search(1, "iPhone", max_price=40)
+    assert not decide(p, capped, 35, ai_answer(modell_key="keins"), final=True).notify
+    assert decide(p, capped, 35, ai_answer(modell_key="iPhone 13"), final=True).notify
+    free = Profile(key="s", max_prices={"X": 10})  # no fixed model list: own cap still allows
+    assert decide(free, capped, 35, ai_answer(modell_key="keins"), final=True).notify
