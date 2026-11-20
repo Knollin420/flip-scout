@@ -246,6 +246,28 @@ check_icloud = false
 "Switch (normal, V1/V2)" = 50
 "Switch OLED" = 50
 
+# Nur willhaben (keine Vinted-Suche)
+[profile.xbox]
+label = "Xbox Series"
+emoji = "🟩"
+exclude = ["nur controller", "controller only", "nur spiele", "nur ovp", "leere ovp", "nur karton", "xbox 360"]
+exclude_desc = ["ich suche", "nur tausch", "suche xbox"]
+ai_check = """Eine funktionsfähige Microsoft Xbox Series S oder Xbox Series X Konsole. Die Konsole selbst
+muss dabei sein; Controller, Kabel und Karton dürfen fehlen.
+- 'Xbox Series S': kleine weiße (oder 'Carbon Black' 1 TB) Konsole ohne Laufwerk.
+- 'Xbox Series X': schwarzer Turm, mit Laufwerk; auch 'Digital Edition' (weiß, ohne Laufwerk) zählt als Series X.
+NICHT gemeint (modell_key 'keins' bzw. passt = 'nein'): Xbox One, One S, One X, Xbox 360, nur Controller,
+nur Spiele, nur Zubehör, Suchanzeige, Tausch."""
+ok_defects = []
+no_go = ["defekt, startet nicht oder Laufwerk/HDMI kaputt", "Konsole gesperrt oder gebannt"]
+check_icloud = false
+title_models = true
+title_skip_models = ["Xbox One", "Xbox 360"]
+
+[profile.xbox.max_prices]
+"Xbox Series S" = 200
+"Xbox Series X" = 450
+
 [profile.gpu]
 label = "Grafikkarte"
 emoji = "🖥"
