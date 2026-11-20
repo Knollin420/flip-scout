@@ -56,6 +56,7 @@ willhaben_message_offer = """Hallo {name},
 ich hätte großes Interesse. Wäre es für dich noch in Ordnung auf {limit} herunterzugehen? Ich wohne auch in der Nähe könnte es also Zeitnah abholen. Wäre das heute oder morgen noch möglich?
 vg,
 colin"""
+vinted_pause_hours = [0, 8]   # Vinted nachts pausieren (0–8 Uhr, Wiener Zeit); willhaben läuft weiter
 min_price_everywhere = 3      # alle Suchen: Anzeigen unter 3 € sind meist Lockangebote
 # Ausschlusswörter für ALLE Suchen (Titel und Beschreibung, kostenlos vor der KI)
 exclude_everywhere = [

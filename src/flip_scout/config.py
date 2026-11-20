@@ -29,6 +29,9 @@ class Settings:
     seen_retention_days: int = 30
     # Lowest price for every search (listings below are bait offers); None = no limit
     min_price_everywhere: float | None = None
+    # Vinted night pause: no Vinted requests from start to end hour (local time), e.g. [0, 8].
+    # Afterwards Vinted searches only remember the current listings first (no flood).
+    vinted_pause_hours: list[int] = field(default_factory=list)
     # willhaben.at (Vienna by default). Searches with source "willhaben" use these.
     willhaben_enabled: bool = False
     willhaben_area_id: int = 900

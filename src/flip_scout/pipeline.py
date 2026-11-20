@@ -105,24 +105,42 @@ class Pipeline:
 
     # --- run --------------------------------------------------------------
 
+    def source_paused(self, source: str) -> bool:
+        """Vinted night pause (vinted_pause_hours, local time)."""
+        hours = self.cfg.settings.vinted_pause_hours
+        if source != "vinted" or len(hours) != 2:
+            return False
+        start, end = hours
+        hour = self.cfg.settings.local_time(self.now()).hour
+        return start <= hour < end if start <= end else (hour >= start or hour < end)
+
     def reseed_after_pause(self) -> bool:
         """Vinted no longer sends upload times, so after a long pause everything uploaded
-        meanwhile would look new. After a pause longer than max_age_minutes all searches
-        only remember the current listings again (like a first run)."""
-        last = self.store.get("last_search_ts")
-        if not last:
-            return False
-        pause = self.now() - float(last)
-        if pause <= self.cfg.settings.max_age_minutes * 60:
-            return False
-        if not self.store.list_searches(active_only=True):
-            # Everything paused: nothing to search, so nothing to remember yet. The
-            # reseed happens in the first run after a search is resumed.
-            return False
-        for search in self.store.list_searches():
-            self.store.reset_seeding(search.id)
-        log.info("Pause von %.0f min – merke mir zuerst nur den aktuellen Stand", pause / 60)
-        return True
+        meanwhile would look new. After a pause longer than max_age_minutes the searches of
+        that source only remember the current listings again (like a first run)."""
+        active = self.store.list_searches(active_only=True)
+        reseeded = False
+        for source in sorted({s.source for s in active}):
+            if self.source_paused(source):
+                continue  # still pausing: nothing to remember yet
+            last = self.store.get(f"last_search_ts:{source}") or self.store.get("last_search_ts")
+            if not last:
+                continue
+            pause = self.now() - float(last)
+            if pause <= self.cfg.settings.max_age_minutes * 60:
+                continue
+            for search in self.store.list_searches():
+                if search.source == source:
+                    self.store.reset_seeding(search.id)
+            # count the pause as over, so the next run does not reseed again
+            self.store.set(f"last_search_ts:{source}", str(self.now()))
+            log.info(
+                "%s: Pause von %.0f min – merke mir zuerst nur den aktuellen Stand",
+                source,
+                pause / 60,
+            )
+            reseeded = True
+        return reseeded
 
     def search_interval(self, profile: Profile, search: Search | None = None) -> float:
         """Seconds between two runs of a search with this profile."""
@@ -153,12 +171,15 @@ class Pipeline:
         """One pass over the active searches. only_due=True skips searches whose own
         interval has not passed yet (used by the main loop)."""
         result = RunResult()
+        ok_sources: set[str] = set()
         self.reseed_after_pause()
         first_request = True
         for search in self.store.list_searches(active_only=True):
             profile = self.cfg.profile(search.profile)
             if only_due and not self.is_due(search, profile):
                 continue
+            if self.source_paused(search.source):
+                continue  # e.g. Vinted at night
             client = self.client_for(search.source)
             if client is None:
                 continue  # willhaben not set up
@@ -189,6 +210,7 @@ class Pipeline:
                     log.exception("[%s] Unerwarteter Fehler bei Suche %r", search.name, term)
                     continue
                 result.requests_ok += 1
+                ok_sources.add(search.source)
 
                 if not self.store.is_seeded(search.id, term):
                     for item in items:
@@ -230,6 +252,8 @@ class Pipeline:
                     self.store.unmark_seen(search.id, item.id)
                 except Exception:
                     log.exception("[%s] Fehler bei Anzeige %s", search.name, item.id)
+        for source in ok_sources:
+            self.store.set(f"last_search_ts:{source}", str(self.now()))
         if result.requests_ok:
             self.store.set("last_search_ts", str(self.now()))
         return result

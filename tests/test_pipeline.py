@@ -208,7 +208,7 @@ def test_long_pause_only_remembers_again(env, store, cfg):
     store.add_search("S", "standard", ["s"])
     pipe.run_once()  # first run: remember
     vinted.results["s"] = [make_item(1), make_item(2)]  # uploaded during the night
-    store.set("last_search_ts", str(float(store.get("last_search_ts")) - 8 * 3600))
+    store.set("last_search_ts:vinted", str(float(store.get("last_search_ts:vinted")) - 8 * 3600))
     assert pipe.run_once().hits == 0  # after 8 h pause: only remembered
     vinted.results["s"].insert(0, make_item(3))
     assert pipe.run_once().hits == 1  # really new -> reported
@@ -220,7 +220,7 @@ def test_all_paused_reseeds_only_after_resume(env, store, cfg):
     sid = store.add_search("S", "standard", ["s"])
     pipe.run_once()  # first run: remember
     store.update_search(sid, active=False)
-    store.set("last_search_ts", str(float(store.get("last_search_ts")) - 8 * 3600))
+    store.set("last_search_ts:vinted", str(float(store.get("last_search_ts:vinted")) - 8 * 3600))
     assert pipe.reseed_after_pause() is False  # all paused: nothing to do, no log spam
     vinted.results["s"] = [make_item(1), make_item(2)]  # uploaded while paused
     store.update_search(sid, active=True)
@@ -546,3 +546,30 @@ def test_search_cap_does_not_open_fixed_model_lists(store):
     assert decide(p, capped, 35, ai_answer(modell_key="iPhone 13"), final=True).notify
     free = Profile(key="s", max_prices={"X": 10})  # no fixed model list: own cap still allows
     assert decide(free, capped, 35, ai_answer(modell_key="keins"), final=True).notify
+
+
+def test_vinted_night_pause_and_no_flood_afterwards(env, store, cfg):
+    import datetime as dt
+
+    cfg.profiles["standard"].briefing = False
+    cfg.settings.vinted_pause_hours = [0, 8]
+    pipe, vinted, _, _ = env()
+    wh = store.add_search("W", "standard", ["w"], source="willhaben")
+    store.add_search("V", "standard", ["v"])
+    pipe.willhaben = vinted
+    day = dt.datetime(2026, 11, 20, tzinfo=cfg.settings.local_time(NOW).tzinfo)
+    at = lambda h: (day + dt.timedelta(hours=h)).timestamp()  # noqa: E731
+    pipe.now = lambda: at(-1)  # 23:00: both run and remember the stock
+    pipe.run_once()
+    vinted.results = {"v": [make_item(n) for n in range(1, 40)], "w": [make_item(99)]}
+    for hour in (1, 4, 7.9):  # night: only willhaben is asked
+        pipe.now = lambda h=hour: at(h)
+        vinted.calls.clear()
+        pipe.run_once()
+        assert {c[0] for c in vinted.calls} == {"w"}
+    assert store.is_seen(wh, 99)
+    pipe.now = lambda: at(8.05)  # morning: Vinted first only remembers the night's listings
+    assert pipe.run_once().hits == 0
+    vinted.results["v"].insert(0, make_item(500))
+    pipe.now = lambda: at(8.1)
+    assert pipe.run_once().hits == 1  # really new after the pause -> reported
